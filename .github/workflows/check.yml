@@ -6,11 +6,15 @@
 #
 # 剩下五关是纯静态的，直接在 Linux runner 上跑：
 #   1 封号风险审查 · 4 文档一致性 · 5 仓库卫生 · 6 死代码 · 7 体积
-# `-SkipRegression` 这个开关本来就是为这个场景留的。
 #
-# 为什么失败时要把输出**贴到提交评论**：
-#   GitHub Actions 的原始日志需要登录且有 actions:read 权限才能取，
-#   而提交评论是公开可读的 —— 失败原因谁都能看，也不必为了排查去登录。
+# 为什么拆成两个 step：
+#   GitHub Actions 的**原始日志要登录且有 actions:read 才能取**，
+#   但 **step 列表是公开可读的**（`GET /repos/{o}/{r}/actions/runs/{id}/jobs`）。
+#   把第 1 关单独成步，就能不登录也看出「是哪一半挂了」。
+#
+# 为什么失败时还要贴提交评论：
+#   提交评论同样公开可读，能拿到**完整输出**（比 step 粒度细得多）。
+#   贴评论需要 `contents: write`，所以下面显式声明了最小权限。
 # ============================================================================
 name: 检查
 
@@ -20,6 +24,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write        # 只用于失败时贴提交评论
+
 jobs:
   static:
     name: 静态关卡（五关）
@@ -27,10 +34,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 跑交付检查（跳过需要浏览器的两关）
+      - name: 1 封号风险审查
+        shell: pwsh
+        run: ./工具/安全审查.ps1
+
+      - name: 4-7 文档一致性 / 仓库卫生 / 死代码 / 体积
         id: check
         shell: pwsh
-        # 先不用失败中断：要让下一步有机会把输出贴出去
+        # 先不中断：要让下一步有机会把输出贴出去
         continue-on-error: true
         run: |
           $out = (& ./工具/交付检查.ps1 -SkipRegression 2>&1 | Out-String)
@@ -40,7 +51,8 @@ jobs:
       - name: 失败时把完整输出贴到提交评论
         # ⚠️ 用 steps.check.outcome 而不是 failure()：
         #    上一步带 continue-on-error，failure() 不会为它触发。
-        if: steps.check.outcome == 'failure'
+        if: steps.check.outcome == 'failure' && github.event_name == 'push'
+        continue-on-error: true      # 贴不上去也不该成为失败原因
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,6 +67,7 @@ jobs:
             -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
 
       - name: 让 job 真正失败
-        # continue-on-error 会把整job的结论变成 success —— 那样徽标就在撒谎，这里补一刀
-        if: steps.check.outcome == 'failure'
+        # continue-on-error 会把整 job 的结论变成 success —— 那样徽标就在撒谎，这里补一刀。
+        # 用 always() 保证即使上面贴评论那步自己挂了，这一步照样执行。
+        if: always() && steps.check.outcome == 'failure'
         run: exit 1
