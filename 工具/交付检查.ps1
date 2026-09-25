@@ -204,13 +204,23 @@ if ($isRepo) {
     if ($LASTEXITCODE -ne 0) { $hygiene += "$($s.Name) 没有被 .gitignore 挡住 —— 它可能会被提交上去" }
   }
   # 5.3 已跟踪文件里的超大二进制（截图目录除外）
-  foreach ($f in (& git ls-files)) {
+  # ⚠️ 必须 `-c core.quotePath=false`：git 默认会把非 ASCII 路径转义成 "\345\267\245..."
+  #    那种带引号+八进制的字符串 Test-Path 必然为假 → 中文名的文件被**静默跳过**。
+  #    实测：22 个已跟踪文件里只扫到 8 个（纯 ASCII 名的），却照样报「通过」。
+  $tracked = @(& git -c core.quotePath=false ls-files)
+  $scanned = 0
+  foreach ($f in $tracked) {
     $fp = Join-Path $Root $f
     if (-not (Test-Path $fp)) { continue }
+    $scanned++
     $len = (Get-Item $fp).Length
     if ($len -gt 1MB -and $f -notlike 'screenshots/*') {
       $hygiene += "$f 有 $([math]::Round($len / 1MB, 1)) MB —— 仓库里不该有这么大的文件（截图目录除外）"
     }
+  }
+  # 覆盖本身也要断言：少扫了文件就说明路径解析坏了，不能当通过
+  if ($scanned -lt $tracked.Count) {
+    $hygiene += "已跟踪 $($tracked.Count) 个文件，只检查到 $scanned 个（路径解析失败，或有文件被删除未提交）—— 大文件检查的覆盖不完整"
   }
 } else {
   Write-Host "  (不是 git 仓库或缺 git，跳过忽略规则核对)" -ForegroundColor DarkGray

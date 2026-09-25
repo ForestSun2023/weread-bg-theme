@@ -8,12 +8,9 @@
 #   1 封号风险审查 · 4 文档一致性 · 5 仓库卫生 · 6 死代码 · 7 体积
 # `-SkipRegression` 这个开关本来就是为这个场景留的。
 #
-# 可移植性已逐项核对：`交付检查.ps1` 与 `安全审查.ps1` 零 `System.Drawing`、
-# 零 `Add-Type`、无 Windows 专有路径写法（路径统一用 `/`，`git ls-files` 的输出
-# 也不再被替换成反斜杠）。
-#
-# ⚠️ 注意：这一步会在 runner 的工作副本里往 `工具/审查记录.md` 追加一行（不会提交回来），
-#    所以 CI 上看不到记录增长 —— 权威记录仍以本地 `工具/交付检查.ps1` 的提交为准。
+# 为什么失败时要把输出**贴到提交评论**：
+#   GitHub Actions 的原始日志需要登录且有 actions:read 权限才能取，
+#   而提交评论是公开可读的 —— 失败原因谁都能看，也不必为了排查去登录。
 # ============================================================================
 name: 检查
 
@@ -31,5 +28,33 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 跑交付检查（跳过需要浏览器的两关）
+        id: check
         shell: pwsh
-        run: ./工具/交付检查.ps1 -SkipRegression
+        # 先不用失败中断：要让下一步有机会把输出贴出去
+        continue-on-error: true
+        run: |
+          $out = (& ./工具/交付检查.ps1 -SkipRegression 2>&1 | Out-String)
+          Write-Host $out
+          $out | Set-Content -Path check-output.txt -Encoding utf8
+
+      - name: 失败时把完整输出贴到提交评论
+        # ⚠️ 用 steps.check.outcome 而不是 failure()：
+        #    上一步带 continue-on-error，failure() 不会为它触发。
+        if: steps.check.outcome == 'failure'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $raw = if (Test-Path check-output.txt) { Get-Content check-output.txt -Raw } else { '(没有输出)' }
+          # 用 4 空格缩进做代码块，避免在 PowerShell 字符串里拼 Markdown 围栏
+          $body = ($raw -split "`n" | ForEach-Object { "    $_" }) -join "`n"
+          $text = "❌ 静态关卡未通过`n`n- 提交：${{ github.sha }}`n- 运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`n`n<details><summary>交付检查的完整输出</summary>`n`n$body`n`n</details>"
+          $payload = @{ body = $text } | ConvertTo-Json -Depth 4
+          Invoke-RestMethod -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload `
+            -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/commits/${{ github.sha }}/comments" `
+            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+
+      - name: 让 job 真正失败
+        # continue-on-error 会把整job的结论变成 success —— 那样徽标就在撒谎，这里补一刀
+        if: steps.check.outcome == 'failure'
+        run: exit 1
