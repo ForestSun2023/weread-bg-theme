@@ -7,6 +7,21 @@
 
 ---
 
+## v3.3.0
+
+**只改元数据，没有任何功能或样式改动** —— 注入逻辑、CSS、正文渲染全部照旧。
+
+- 补全元数据：`@license MIT`、`@homepageURL`、`@supportURL`、`@icon`、
+  `@downloadURL` / `@updateURL`（后两者让 Tampermonkey 能直接从这个仓库自动更新）
+- ⚠️ `@updateURL` 指向 `raw.githubusercontent.com`，国内常被墙；发到 GreasyFork 后
+  它会用自己的更新地址覆盖，所以 **CN 用户建议从 GreasyFork 安装**
+- 安全审查的 URL 白名单相应扩到 `homepageURL / supportURL / website` ——
+  否则新增的元数据行会被它自己判成「可疑 URL」
+- 发布图标挪到 `assets/icon-96.png`（纯 ASCII 路径，`@icon` 的 URL 不必再百分号编码）
+
+> 同一批还做了三件工具链改进（不影响脚本行为）：审查制度扩到**七关**
+> （新增「文档一致性」「仓库卫生」）、像素验证加**覆盖自检**、
+> 接入 GitHub Actions 在 Linux 上跑五道静态关卡。详见 `设计思路.md` 第九节。
 ## v3.2.0
 
 - `@namespace` 改为作者自己的命名空间（`https://github.com/ForestSun2023`），`@author` 填上署名

@@ -2,14 +2,20 @@
 // @name         微信读书网页版 · 背景颜色主题
 // @name:zh-CN   微信读书网页版 · 背景颜色主题
 // @namespace    https://github.com/ForestSun2023
-// @version      3.2.0
+// @version      3.3.0
 // @description  给微信读书网页版阅读页补上手机 App 才有的「亮度 / 颜色 / 背景」功能：白天三色（白 / 米黄 / 青绿）× 五种纸张背景。白天/黑夜沿用站点原生的「深色」按钮，黑夜模式完全用官方原装外观。
 // @author       ForestSun
+// @license      MIT
+// @homepageURL  https://github.com/ForestSun2023/weread-bg-theme
+// @supportURL   https://github.com/ForestSun2023/weread-bg-theme/issues
+// @icon         https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/assets/icon-96.png
 // @match        https://weread.qq.com/web/reader/*
 // @match        https://weread.qq.com/web/*
 // @run-at       document-idle
 // @grant        none
 // @noframes
+// @downloadURL  https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js
+// @updateURL    https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js
 // ==/UserScript==
 
 /*

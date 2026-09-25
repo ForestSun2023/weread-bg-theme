@@ -1,7 +1,8 @@
 # 微信读书网页版 · 背景颜色主题
 
 [![安装](https://img.shields.io/badge/安装-Tampermonkey-2ea44f)](https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js)
-![版本](https://img.shields.io/badge/版本-3.2.0-blue)
+![版本](https://img.shields.io/badge/版本-3.3.0-blue)
+![检查](https://github.com/ForestSun2023/weread-bg-theme/actions/workflows/check.yml/badge.svg)
 ![许可](https://img.shields.io/github/license/ForestSun2023/weread-bg-theme?label=许可)
 ![最近提交](https://img.shields.io/github/last-commit/ForestSun2023/weread-bg-theme?label=最近提交)
 
@@ -142,7 +143,12 @@ wrbg.fullscreen   // 全屏诊断：F11 无法直接查询，这里能看到脚�
 ```powershell
 pwsh -File "工具\交付检查.ps1"     # 一条命令跑完全部七道关卡，并往 工具/审查记录.md 追加一条
 # 退出码 0 = 全部通过；>0 = 未通过的关卡数
+# 只跑静态关卡（几秒钟，CI 用的就是这个）：加 -SkipRegression
 ```
+
+第 1、4、5、6、7 关是**纯静态**的，已经接进 GitHub Actions（[`.github/workflows/check.yml`](.github/workflows/check.yml)），
+每次 push 自动跑一次 —— 这也顺带证明了这些脚本不依赖 Windows。
+第 2、3 关要起无头浏览器 + 阅读页快照，只能在本地跑。
 
 | # | 关卡 | 做什么 |
 |---|---|---|
@@ -184,6 +190,8 @@ pwsh -File "工具\交付检查.ps1"     # 一条命令跑完全部七道关卡�
 ├─ CHANGELOG.md
 ├─ LICENSE
 ├─ screenshots/               # README 用图（由 工具/生成截图.ps1 渲染，带自校验）
+├─ assets/                    # 发布图标（@icon 会引用它的 URL，所以必须是纯 ASCII 路径）
+├─ .github/workflows/check.yml # CI：在 Linux 上跑五道静态关卡
 ├─ 发布/                       # 发布到脚本站要用的素材
 │  ├─ GreasyFork-附加信息.md   # 直接粘进 GreasyFork「附加信息」栏的内容
 │  └─ 图标-96.png              # 脚本图标（由 工具/生成图标.ps1 生成）
