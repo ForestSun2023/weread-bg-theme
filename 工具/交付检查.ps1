@@ -83,7 +83,7 @@ if ($SkipPixel -or $SkipRegression) {
   $pxPass = ($pxOut | Select-String -Pattern '^\s+PASS').Count
   $pxFail = ($pxOut | Select-String -Pattern '^\s+FAIL').Count
   $pxOut | Select-String -Pattern 'FAIL|结论' | ForEach-Object { Write-Host $_.Line }
-  Write-Host ("  {0} 种组合通过 / {1} 种未达标（3 色 × 5 纹理）" -f $pxPass, $pxFail)
+  Write-Host ("  {0} 项通过 / {1} 项未达标（15 格组合 + 一条覆盖自检）" -f $pxPass, $pxFail)
   if ($pxPass -eq 0) { Write-Host "  [ 失败 ] 一格都没渲染出来" -ForegroundColor Red; $failed++ }
   elseif (-not $pxOk) { $failed++ }
 }
@@ -130,9 +130,12 @@ if (Test-Path $usagePath) {
 } else { $docIssues += "使用说明.md 不存在" }
 
 # 4.3 各文档声称的 wrbg.colors / wrbg.backgrounds 取值
-foreach ($doc in @('README.md', '发布\GreasyFork-附加信息.md')) {
+foreach ($doc in @('README.md', '发布/GreasyFork-附加信息.md')) {
   $p = Join-Path $Root $doc
-  if (-not (Test-Path $p)) { continue }
+  # ⚠️ 文档不存在时**不能直接 continue** —— 那会让这一关「静默少查几项」却仍然报通过。
+  # 本项目吃过这个亏：回归验证曾经连续 4 次输出「0 通过 / 0 失败」看着像通过，
+  # 其实是一条断言都没跑出来。查不到目标 = 失败。
+  if (-not (Test-Path $p)) { $docIssues += "$doc 不存在 —— 这一关的覆盖范围变小了，不能算通过"; continue }
   $t = Get-Content $p -Raw -Encoding UTF8
   foreach ($pair in @(@('colors', $realColorIds), @('backgrounds', $realBgIds))) {
     $key = $pair[0]; $real = $pair[1]
@@ -150,7 +153,7 @@ foreach ($h in (@([regex]::Matches($readme, '#[0-9a-fA-F]{6}') | ForEach-Object 
 
 # 4.5 GreasyFork 附加信息不能有相对链接
 #   它的标记白名单只允许 https 图片，而且那个页面不在仓库上下文里 —— 相对路径必然失效。
-$gfyPath = Join-Path $Root '发布\GreasyFork-附加信息.md'
+$gfyPath = Join-Path $Root '发布/GreasyFork-附加信息.md'
 if (Test-Path $gfyPath) {
   $gfy = Get-Content $gfyPath -Raw -Encoding UTF8
   $relCount = ([regex]::Matches($gfy, '\]\((?!https?:)[^)]+\)')).Count
@@ -202,7 +205,7 @@ if ($isRepo) {
   }
   # 5.3 已跟踪文件里的超大二进制（截图目录除外）
   foreach ($f in (& git ls-files)) {
-    $fp = Join-Path $Root ($f -replace '/', '\')
+    $fp = Join-Path $Root $f
     if (-not (Test-Path $fp)) { continue }
     $len = (Get-Item $fp).Length
     if ($len -gt 1MB -and $f -notlike 'screenshots/*') {

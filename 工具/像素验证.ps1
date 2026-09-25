@@ -154,10 +154,37 @@ $cases = @(
 
 )
 
+# ---------------------------------------------------------------- 覆盖自检
+# 用例本身是硬编码的（每格要填官方实测值，推导不出来），但**覆盖面**必须自动核对：
+# 以后加了第 4 种底色或第 6 种纹理，很容易只改脚本、忘了加用例 ——
+# 那样这一关就会「少验几格还报通过」。所以从脚本里解析出真实 id，
+# 断言用例集合正好等于 COLORS × BACKGROUNDS 的笛卡尔积（少一个或多一个都算失败）。
+$srcJs  = Get-Content $ScriptPath -Raw -Encoding UTF8
+$cBlock = [regex]::Match($srcJs, '(?s)const COLORS = \[(.*?)\n  \];').Groups[1].Value
+$bBlock = [regex]::Match($srcJs, '(?s)const BACKGROUNDS = \[(.*?)\n  \];').Groups[1].Value
+$realColors = @([regex]::Matches($cBlock, "id: '([a-z]+)'") | ForEach-Object { $_.Groups[1].Value })
+$realBgs    = @([regex]::Matches($bBlock, "id: '([a-z]+)'") | ForEach-Object { $_.Groups[1].Value })
+$expectPairs = @()
+foreach ($rc in $realColors) { foreach ($rb in $realBgs) { $expectPairs += "$rc/$rb" } }
+$havePairs  = @($cases | ForEach-Object { "$($_.c)/$($_.b)" })
+$missPairs  = @($expectPairs | Where-Object { $havePairs -notcontains $_ })
+$extraPairs = @($havePairs | Where-Object { $expectPairs -notcontains $_ })
+
 # ---------------------------------------------------------------- 逐格渲染 + 采样
 $fails = 0
 $rows = @()
-$solidMoon = @{}          # 每个颜色的「纯色」月亮盒基准，用来隔离站点自带导航栏的干扰
+
+if ($realColors.Count -lt 2 -or $realBgs.Count -le 1) {
+  $rows += "  FAIL  覆盖自检  解析不出脚本的 COLORS/BACKGROUNDS（拿到 $($realColors.Count) 色 / $($realBgs.Count) 纹理）—— 自检本身失效了"
+  $fails++
+} elseif ($missPairs.Count -or $extraPairs.Count) {
+  $rows += "  FAIL  覆盖自检  用例 $($havePairs.Count) 种 ≠ 脚本 $($realColors.Count) 色 × $($realBgs.Count) 纹理 = $($expectPairs.Count) 种"
+  if ($missPairs.Count)  { $rows += "         缺用例：$($missPairs -join ', ')" }
+  if ($extraPairs.Count) { $rows += "         多余或拼错：$($extraPairs -join ', ')" }
+  $fails++
+} else {
+  $rows += "  PASS  覆盖自检  用例 $($havePairs.Count) 种 == 脚本 $($realColors.Count) 色 × $($realBgs.Count) 纹理"
+}
 
 foreach ($cs in $cases) {
   $png = Join-Path $Tmp ("shot\" + $cs.c + '-' + $cs.b + '.png')

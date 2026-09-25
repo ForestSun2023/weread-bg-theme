@@ -78,7 +78,7 @@ if (-not $urlHits) {
   foreach ($h in $urlHits) {
     $line = $h.Line.Trim()
     if ($line.Length -gt 96) { $line = $line.Substring(0, 96) + '…' }
-    $isMeta = $line -match '^\s*//\s*@(namespace|match|icon|require|updateURL|downloadURL)'
+    $isMeta = $line -match '^\s*//\s*@(namespace|match|icon|require|updateURL|downloadURL|homepageURL|supportURL|website)'
     $isSvg  = $line -match 'www\.w3\.org/2000/svg'
     $mark = if ($isMeta -or $isSvg) { '  ok ' } else { '  ⚠  ' }
     Write-Host "$mark L$($h.LineNumber): $line"

@@ -1,7 +1,8 @@
 ﻿# ============================================================================
 # 微信读书脚本 · 生成发布用图标
 # ----------------------------------------------------------------------------
-# 产出：发布/图标-96.png（GreasyFork 的脚本图标，96x96）
+# 产出：assets/icon-96.png（发布用脚本图标，96x96）
+# 放在纯 ASCII 目录里，因为脚本元数据的 @icon 会引用它的 URL —— 中文路径要百分号编码
 #
 # 设计：深色圆角底 + 三张色卡（白 / 米黄 / 青绿），中间那张带金色描边 = 面板里
 #       「当前生效」的样子。图案元素全部来自脚本自己的配色，零第三方素材。
@@ -17,7 +18,7 @@ $ErrorActionPreference = 'Continue'
 Add-Type -AssemblyName System.Drawing
 
 $Root = Split-Path $PSScriptRoot -Parent
-$OutDir = Join-Path $Root '发布'
+$OutDir = Join-Path $Root 'assets'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 # 与脚本 COLORS 里的官方实测底色保持一致
@@ -93,7 +94,7 @@ $dst = New-Object System.Drawing.Rectangle(0, 0, $Size, $Size)
 $g2.DrawImage($bmp, $dst, 0, 0, $W, $W, [System.Drawing.GraphicsUnit]::Pixel)
 $g2.Dispose()
 
-$png = Join-Path $OutDir '图标-96.png'
+$png = Join-Path $OutDir 'icon-96.png'
 $out.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
 
 # 自检：尺寸对不对、三个色卡的颜色有没有画上去
