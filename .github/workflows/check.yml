@@ -44,9 +44,22 @@ jobs:
         # 先不中断：要让下一步有机会把输出贴出去
         continue-on-error: true
         run: |
-          $out = (& ./工具/交付检查.ps1 -SkipRegression 2>&1 | Out-String)
-          Write-Host $out
-          $out | Set-Content -Path check-output.txt -Encoding utf8
+          # 这一段的全部意义就是「无论如何都留下一份输出」。
+          # 第一版写成 $out = (& ... | Out-String) 然后才写文件：结果脚本那一行抛了
+          # 终止性错误，后面全没执行 → 评论里只有「(没有输出)」，诊断通道等于白建。
+          # 所以：try/catch 兜住 + 先落盘再打印。
+          $ErrorActionPreference = 'Continue'
+          $code = 99
+          try {
+            $out = (& ./工具/交付检查.ps1 -SkipRegression 2>&1 | Out-String)
+            $code = $LASTEXITCODE
+            if (-not $out) { $out = '(脚本没有产生任何输出)' }
+          } catch {
+            $out = "调用交付检查时抛异常：`n$_`n`n$($_.ScriptStackTrace)"
+          }
+          "退出码 = $code" | Set-Content -Path check-output.txt -Encoding utf8
+          $out | Add-Content -Path check-output.txt
+          Get-Content check-output.txt -Raw | Write-Host
 
       - name: 失败时把完整输出贴到提交评论
         # ⚠️ 用 steps.check.outcome 而不是 failure()：

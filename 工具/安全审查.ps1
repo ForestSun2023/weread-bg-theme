@@ -13,6 +13,11 @@
 param(
   [string]$Path = (Join-Path (Split-Path $PSScriptRoot -Parent) 'weread-bg-theme.user.js')
 )
+# ⚠️ 显式声明错误偏好，**不要依赖调用方**。
+# GitHub Actions 的 pwsh shell 会在脚本前注入 $ErrorActionPreference = 'stop'，
+# 而这个脚本是按 Continue 写的（用 -ErrorAction SilentlyContinue + 查  处理错误）。
+# 结果就是经典的「本地全过、CI 挂」，而且挂得莫名其妙 —— 所以这里把它钉死。
+$ErrorActionPreference = 'Continue'
 
 if (-not (Test-Path $Path)) { Write-Host "找不到脚本：$Path" -ForegroundColor Red; exit 1 }
 
