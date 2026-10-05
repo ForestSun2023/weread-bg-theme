@@ -1,6 +1,6 @@
 # 微信读书网页版 · 背景颜色主题
 
-[![安装](https://img.shields.io/badge/安装-Tampermonkey-2ea44f)](https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js)
+[![安装](https://img.shields.io/badge/安装-Tampermonkey-2ea44f)](https://greasyfork.org/zh-CN/scripts/597755)
 ![版本](https://img.shields.io/badge/版本-4.0.0-blue)
 ![检查](https://github.com/ForestSun2023/weread-bg-theme/actions/workflows/check.yml/badge.svg)
 ![许可](https://img.shields.io/github/license/ForestSun2023/weread-bg-theme?label=许可)
@@ -45,8 +45,9 @@
 ## 安装
 
 1. 给浏览器装 [Tampermonkey](https://www.tampermonkey.net/)（或 Violentmonkey）
-2. 安装脚本 —— 点这里：
-   [`weread-bg-theme.user.js`](https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js)
+2. 安装脚本 —— 在 **GreasyFork** 上点「安装此脚本」：
+   <https://greasyfork.org/zh-CN/scripts/597755>
+   （GreasyFork 会**自动同步**新版本，脚本管理器会提示更新。国内可直接访问。）
 3. 打开任意一章阅读页：`https://weread.qq.com/web/reader/...`
 4. **把鼠标移到页面中间** —— 右侧工具条平时是隐藏的，移动鼠标才会浮出来
 
