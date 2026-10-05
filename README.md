@@ -1,7 +1,7 @@
 # 微信读书网页版 · 背景颜色主题
 
 [![安装](https://img.shields.io/badge/安装-Tampermonkey-2ea44f)](https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js)
-![版本](https://img.shields.io/badge/版本-3.4.1-blue)
+![版本](https://img.shields.io/badge/版本-3.5.0-blue)
 ![检查](https://github.com/ForestSun2023/weread-bg-theme/actions/workflows/check.yml/badge.svg)
 ![许可](https://img.shields.io/github/license/ForestSun2023/weread-bg-theme?label=许可)
 ![最近提交](https://img.shields.io/github/last-commit/ForestSun2023/weread-bg-theme?label=最近提交)
@@ -141,7 +141,7 @@ wrbg.fullscreen   // 全屏诊断：F11 无法直接查询，这里能看到脚�
 ## 开发与验证
 
 ```powershell
-pwsh -File "工具\交付检查.ps1"     # 一条命令跑完全部七道关卡，并往 工具/审查记录.md 追加一条
+pwsh -File "工具\交付检查.ps1"     # 一条命令跑完全部七道关卡，并更新 工具/审查记录.md（一版一行，重跑则原地更新）
 # 退出码 0 = 全部通过；>0 = 未通过的关卡数
 # 只跑静态关卡（几秒钟，CI 用的就是这个）：加 -SkipRegression
 ```

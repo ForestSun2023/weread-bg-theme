@@ -2,7 +2,7 @@
 // @name         微信读书网页版 · 背景颜色主题
 // @name:zh-CN   微信读书网页版 · 背景颜色主题
 // @namespace    https://github.com/ForestSun2023
-// @version      3.4.1
+// @version      3.5.0
 // @description  给微信读书网页版阅读页补上手机 App 才有的「亮度 / 颜色 / 背景」功能：白天三色（白 / 米黄 / 青绿）× 五种纸张背景。白天/黑夜沿用站点原生的「深色」按钮，黑夜模式完全用官方原装外观。
 // @author       ForestSun
 // @license      MIT
@@ -522,7 +522,7 @@ html[data-wrbg] .reader_float_panel_container {
       // !important，普通内联样式会被压掉 —— 实测双栏模式下图标根本没变红。
       // 这是回归验证里新加的那条断言抓出来的：光靠人工看代码会以为它已经生效。
       btn.style.setProperty('color', '#e5484d', 'important');
-      btn.title = '⚠ 主题未生效，微信读书可能已改版（运行 工具/weread-probe2.js 可生成反馈报告）';
+      btn.title = '⚠ 主题未生效，微信读书可能已改版。可在 github.com/ForestSun2023/weread-bg-theme/issues 反馈';
       if (tip) tip.textContent = '⚠ 主题未生效';
     } else {
       host.removeAttribute('data-wrbg-warn');
@@ -549,7 +549,7 @@ html[data-wrbg] .reader_float_panel_container {
         '[wrbg] 主题未生效，微信读书可能改版了。\n' +
         '  预期底色：' + getComputedStyle(document.documentElement).getPropertyValue('--wrbg-bg').trim() + '\n' +
         '  实际不符：' + bad + '\n' +
-        '  请运行「工具/weread-probe2.js」，把报告反馈给脚本作者。'
+        '  请在 github.com/ForestSun2023/weread-bg-theme/issues 反馈（附上这条日志即可）。'
       );
     }, 1200);
   }
@@ -598,11 +598,14 @@ html[data-wrbg] .reader_float_panel_container {
 
     // 颜色行：四套底色任何时候都在（黑只是第四种，不再跟「模式」绑定）
     rowColorEl.textContent = '';
+    rowColorEl.setAttribute('role', 'radiogroup');
+    rowColorEl.setAttribute('aria-label', '底色');
     COLORS.forEach((c) => {
       const item = document.createElement('div');
       item.className = 'wrbg-swatch';
       item.title = c.name;
       item.dataset.active = c.id === state.colorId ? '1' : '0';
+
       item.style.cssText = swatchStyle(c, BACKGROUNDS[0]);
       item.addEventListener('click', () => {
         state.colorId = c.id;
@@ -613,11 +616,14 @@ html[data-wrbg] .reader_float_panel_container {
 
     // 背景行：五种纹理对每种底色都各有一份实测值，预览底色跟着当前配色走
     rowBgEl.textContent = '';
+    rowBgEl.setAttribute('role', 'radiogroup');
+    rowBgEl.setAttribute('aria-label', '背景纹理');
     BACKGROUNDS.forEach((b) => {
       const item = document.createElement('div');
       item.className = 'wrbg-swatch';
       item.title = b.name;
       item.dataset.active = b.id === state.bgId ? '1' : '0';
+
       item.style.cssText = swatchStyle(current, b);
       item.addEventListener('click', () => {
         state.bgId = b.id;
@@ -795,6 +801,7 @@ html[data-wrbg] .reader_float_panel_container {
     brightness.insertAdjacentHTML('beforeend', SUN_SVG);
 
     const range = document.createElement('input');
+    range.setAttribute('aria-label', '亮度');
     range.type = 'range';
     range.className = 'wrbg-range';
     range.min = '0';
