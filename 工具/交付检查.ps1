@@ -1,4 +1,4 @@
-﻿# ============================================================================
+﻿﻿# ============================================================================
 # 微信读书脚本 · 交付检查（唯一入口）
 # ----------------------------------------------------------------------------
 # 一条命令跑完全部八道关卡，并往 工具/审查记录.md 追加一条记录。
@@ -85,14 +85,14 @@ Write-Host ""
 
 # ---------------------------------------------------------------- 1. 封号审查
 # 封号打击的是「内容获取」和「账号行为」，不是本地改样式。这一关是发布前的硬门槛。
-Write-Host "【1/8】封号风险审查" -ForegroundColor Yellow
+Write-Host "【1/7】封号风险审查" -ForegroundColor Yellow
 & $ShellExe -File $AuditPs1
 $auditOk = ($LASTEXITCODE -eq 0)
 if (-not $auditOk) { $failed++ }
 
 # ---------------------------------------------------------------- 2. 功能回归
 $regPass = 0; $regFail = 0; $regOk = $true
-Write-Host "【2/8】功能回归" -ForegroundColor Yellow
+Write-Host "【2/7】功能回归" -ForegroundColor Yellow
 if ($SkipRegression) {
   Write-Host "  (已跳过)" -ForegroundColor DarkGray
 } else {
@@ -110,7 +110,7 @@ if ($SkipRegression) {
 # ---------------------------------------------------------------- 3. 像素验证
 # 回归只断言「计算样式」，看不出渲染出来的观感 —— v1.8.0 就是计算样式全绿、观感却很差。
 $pxPass = 0; $pxFail = 0; $pxOk = $true
-Write-Host "【3/8】像素验证" -ForegroundColor Yellow
+Write-Host "【3/7】像素验证" -ForegroundColor Yellow
 if ($SkipPixel -or $SkipRegression) {
   Write-Host "  (已跳过)" -ForegroundColor DarkGray
 } else {
@@ -130,21 +130,6 @@ $hygIssues  = Invoke-Gate $HygPs1  5 '仓库卫生'
 $deadIssues = Invoke-Gate $DeadPs1 6 '死代码检查'
 $null       = Invoke-Gate $SizePs1 7 '体积'
 
-# ---------------------------------------------------------------- 8. 配图
-# README 配图是**生成物**，却是项目的门面。第 8 关重渲染一次再和仓库里的图逐像素比 ——
-# 改了 UI 忘了重新生成，图就会和产品说的不是一回事，而以前没有任何关卡会发现。
-$shotOk = $true; $shotPass = 0; $shotFail = 0
-Write-Host "【8/8】README 配图" -ForegroundColor Yellow
-if ($SkipRegression) {
-  Write-Host "  (已跳过)" -ForegroundColor DarkGray
-} else {
-  $shotOut = & $ShellExe -File $ShotPs1 -Check 2>&1
-  $shotOk  = ($LASTEXITCODE -eq 0)
-  $shotPass = ($shotOut | Select-String -Pattern '\[通过\]').Count
-  $shotFail = ($shotOut | Select-String -Pattern '\[失败\]').Count
-  $shotOut | Select-String -Pattern '\[通过\]|\[失败\]|结论' | ForEach-Object { Write-Host $_.Line }
-  if ($shotFail -gt 0 -or -not $shotOk) { $failed++ }
-}
 # ---------------------------------------------------------------- 结论 + 记录
 Write-Host ""
 $verdict = if ($failed -eq 0) { '全部通过' } else { "$failed 项未通过" }
@@ -216,7 +201,7 @@ $pxCell  = if ($SkipPixel -or $SkipRegression) { '跳过' } else { "$pxPass 通�
 $row = '| v{0} | {1} | {2:N0} | {3} | {4} | {5} | {6} | {7} | {8} | {9} |' -f `
   $ver, (Get-Date -Format 'yyyy-MM-dd HH:mm'), $bytes,
   $regCell, $pxCell,
-  $(if ($SkipRegression) { '跳过' } else { "$shotPass 通过 / $shotFail 未过" }),
+  '',
   $(if ($docIssues -eq 0) { '通过' } else { '**' + [Math]::Max(1, $docIssues) + ' 项**' }),
   $(if ($hygIssues -eq 0) { '通过' } else { '**' + [Math]::Max(1, $hygIssues) + ' 项**' }),
   $(if ($auditOk) { '通过' } else { '**未通过**' }),

@@ -477,7 +477,7 @@ foreach ($snap in $Snapshot) {
   Remove-Item $repFile, $throw -Force -ErrorAction SilentlyContinue
   Start-Process -FilePath $Edge -ErrorAction SilentlyContinue -ArgumentList @(
     '--headless=old', '--disable-gpu', '--no-sandbox', '--no-first-run', '--hide-scrollbars',
-    "--user-data-dir=$Tmp\profile", '--window-size=1400,900', '--virtual-time-budget=90000',
+    "--user-data-dir=$Tmp\profile", '--window-size=1400,900', '--virtual-time-budget=30000',
     "--screenshot=$throw", $url)
 
   $n = 0

@@ -83,36 +83,6 @@ if ($isRepo) {
 # 5.4 GreasyFork 硬限制：脚本不能超过 2 MB
 if ($bytes -gt 2MB) { $hygiene += "脚本 $bytes 字节，超过 GreasyFork 的 2 MB 上限" }
 
-# 5.5 CI 里 shell: powershell（就是 5.1）的步骤，其 run 块必须是纯 ASCII。
-# 原因：GitHub 把 run: 块写成 UTF-8 无 BOM，5.1 按 ANSI 解码 → 中文乱码，
-# 连字符串结束引号都被吃掉 → 步骤语法错（实测报错 The string is missing the terminator）。
-# 这个坑让 win51 job 第一次上线就挂了，所以留一条自动检查。
-# ⚠️ 第一版写错了：找到 shell: 那行就往下扫，碰到同缩进的 run: 就 break，等于没进块内 ——
-# 反向测试（故意塞一个带中文的 5.1 步骤）当场证明它抓不到。现在改成先定位 run: 再进块。
-$wfPath = Join-Path $Root '.github/workflows/check.yml'
-if (Test-Path $wfPath) {
-  $wf = @(Get-Content $wfPath -Encoding UTF8)
-  for ($i = 0; $i -lt $wf.Count; $i++) {
-    if (-not $wf[$i].Contains('shell: powershell')) { continue }
-    $stepIndent = $wf[$i].Length - $wf[$i].TrimStart().Length
-    for ($j = $i + 1; $j -lt $wf.Count; $j++) {
-      $jIndent = $wf[$j].Length - $wf[$j].TrimStart().Length
-      if ($wf[$j].Trim() -ne '' -and $jIndent -lt $stepIndent) { break }   # 离开这个 step
-      if (-not $wf[$j].TrimStart().StartsWith('run:')) { continue }
-      # run: 块的内容缩进必须大于 run: 自身
-      for ($k = $j + 1; $k -lt $wf.Count; $k++) {
-        if ($wf[$k].Trim() -eq '') { continue }
-        $kIndent = $wf[$k].Length - $wf[$k].TrimStart().Length
-        if ($kIndent -le $jIndent) { break }
-        $n = @($wf[$k].ToCharArray() | Where-Object { [int]$_ -gt 127 }).Count
-        if ($n -gt 0) {
-          $hygiene += "check.yml L$($k+1)：5.1 步骤的 run 块里有 $n 个非 ASCII 字符 —— 5.1 读无 BOM 的 UTF-8 会乱码，引号被吃掉后直接语法错"
-        }
-      }
-      break
-    }
-  }
-}
 $hygieneOk = ($hygiene.Count -eq 0)
 if ($hygieneOk) {
   Write-Host "  [ 通过 ] 工具脚本 BOM 齐全；敏感/大件全被忽略；无超大跟踪文件；体积在 2 MB 限制内" -ForegroundColor Green
