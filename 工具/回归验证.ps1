@@ -321,6 +321,31 @@ $harness = @'
   })();
   q('.wrbg-btn:not(.wrbg-fs-btn)').click();
 
+    // --- 站点改版自检：故障必须「用户可见」，不能只写 Console ---
+    // 这一段的意义：v3.4.0 加了「自检失败就把背景图标染红」，但正常快照下
+    // themeMismatch() 永远返回空，那条分支不会被任何断言覆盖 —— 只能靠人工看代码。
+    // 这里人为制造一次失配，把「人工审查」换成自动断言（两个方向都测）。
+    var warn0 = q('.wrbg-theme-host');
+    ok('自检初始未报警（正常快照下不该染红）', !!warn0 && !warn0.hasAttribute('data-wrbg-warn'));
+
+    // 用内联 + important 覆盖 body 底色：内联 important 优先于任何 author 样式表规则，
+    // 比注入 <style> 稳（不用去比和脚本自己 !important 的优先级）。
+    document.body.style.setProperty('background-color', '#123456', 'important');
+    window.wrbg.set({ brightness: 0.9 });   // 触发 apply() → scheduleSelfCheck()
+    await S(1500);                          // 自检延迟 1200ms
+    var warn1 = q('.wrbg-theme-host'), warnBtn = warn1 && warn1.querySelector('button');
+    ok('失配时「背景」按钮被标记（用户可见，而非只写 Console）',
+       !!warn1 && warn1.getAttribute('data-wrbg-warn') === '1' &&
+       !!warnBtn && getComputedStyle(warnBtn).color.replace(/\s+/g, '') === 'rgb(229,72,77)',
+       'attr=' + (warn1 && warn1.getAttribute('data-wrbg-warn')) + ' color=' + (warnBtn && getComputedStyle(warnBtn).color));
+
+    document.body.style.removeProperty('background-color');
+    window.wrbg.set({ brightness: 0.9 });   // 再触发一次自检
+    await S(1500);
+    var warn2 = q('.wrbg-theme-host');
+    ok('恢复正常后警示自动消失', !!warn2 && !warn2.hasAttribute('data-wrbg-warn'),
+       'attr=' + (warn2 && warn2.getAttribute('data-wrbg-warn')));
+
   } catch (e) {
     lines.push('FAIL  断言脚本自身抛异常（后面的断言都没跑到）: ' + ((e && (e.stack || e.message)) || e));
     fails++;

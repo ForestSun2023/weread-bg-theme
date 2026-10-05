@@ -40,3 +40,7 @@ desktop.ini
 ~$*
 *.tmp
 *.log
+
+# 与本项目无关的本地素材（别的会话/工具留下的测试图）—— 不纳入版本控制，
+# 也避免 git add -A 时被顺手提交进来。
+pelican-bicycle*

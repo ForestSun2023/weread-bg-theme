@@ -94,6 +94,21 @@ if (Test-Path $gfyPath) {
   if ($relCount -gt 0) { $docIssues += "发布\GreasyFork-附加信息.md 里有 $relCount 处相对链接（GreasyFork 上会失效）" }
 }
 
+# 4.6 文档里的关卡数必须与实际关卡脚本一致（防止「加了关卡忘了改文档」）
+# 实际关卡 = 3 个专门脚本 + 工具/关卡-*.ps1
+$gateCount = @(Get-ChildItem (Join-Path $Root '工具') -Filter *.ps1 |
+  Where-Object { $_.Name -match '^(安全审查|回归验证|像素验证|关卡-)' }).Count
+$cnNum = @{ 1 = '一'; 2 = '二'; 3 = '三'; 4 = '四'; 5 = '五'; 6 = '六'; 7 = '七'; 8 = '八'; 9 = '九' }
+$wantPhrase = "$($cnNum[$gateCount])道关卡"
+if (-not $cnNum.ContainsKey($gateCount)) { $docIssues += "关卡数 $gateCount 超出了这个检查支持的中文数字范围" }
+foreach ($doc in @('README.md', '设计思路.md')) {
+  $p = Join-Path $Root $doc
+  if (-not (Test-Path $p)) { $docIssues += "$doc 不存在"; continue }
+  $t2 = Get-Content $p -Raw -Encoding UTF8
+  if ($t2 -notmatch [regex]::Escape($wantPhrase)) {
+    $docIssues += "$doc 里没有「$wantPhrase」（实际有 $gateCount 个关卡脚本）—— 关卡增减后文档没跟着改"
+  }
+}
 $docOk = ($docIssues.Count -eq 0)
 if ($docOk) {
   Write-Host ("  [ 通过 ] 版本号 4 处对齐（脚本/README徽标/CHANGELOG/使用说明）；" +
