@@ -1,0 +1,40 @@
+# ============================================================================
+# EditorConfig —— 给编辑器/IDE 钉死字符集与换行
+# ----------------------------------------------------------------------------
+# 为什么需要这个文件：
+#   本项目两次因为 **UTF-8 BOM 丢失** 出事：
+#     ① 第一次让 `工具/交付检查.ps1` 整个跑不起来（宿主是 Windows PowerShell 5.1 +
+#        ANSI 代码页 936，无 BOM 的中文注释被当 GBK 解码 → 直接语法错）；
+#     ② 第二次是改脚本时丢了 BOM，被第 5 关「仓库卫生」当场拦住。
+#   第 5 关能**检测**，但检测是事后补救；`charset = utf-8-bom` 才是**预防** ——
+#   它会让编辑器保存时自动写回 BOM，从源头上不产生这个问题。
+#
+# 注意：`.gitattributes` 管的是 git 检出/入库时的换行（已钉 `*.ps1 eol=crlf`），
+#       但它**管不了字符集** —— 字符集只能靠 EditorConfig 或工具链保证。
+# ============================================================================
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# PowerShell 必须是 UTF-8 **带 BOM** + CRLF：
+# 无 BOM 时 5.1 按 ANSI 代码页解码中文注释，脚本直接语法错。
+[*.ps1]
+charset = utf-8-bom
+end_of_line = crlf
+
+# 装了 BOM 就废的格式 / 会破坏 diff 的格式
+[*.{json,yml,yaml}]
+charset = utf-8
+end_of_line = lf
+
+[*.md]
+# 中文文档里行尾空格常是「两个空格换行」的 Markdown 语法，别自动删
+trim_trailing_whitespace = false
+
+# 二进制：别让编辑器碰
+[*.{png,jpg,jpeg,ico,apk,har}]
+insert_final_newline = false

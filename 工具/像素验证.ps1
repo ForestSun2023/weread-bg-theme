@@ -250,7 +250,9 @@ Remove-Job $job -Force -ErrorAction SilentlyContinue
 # ---------------------------------------------------------------- 输出
 Write-Host ""
 Write-Host "===== 像素验证：3 色 × 5 纹理 = 15 种组合（1240x2772 实拍）=====" -ForegroundColor Cyan
-Write-Host "  快照：$($snap.Name)"
+$ageDays = [int]((Get-Date) - $snap.LastWriteTime).TotalDays
+Write-Host "  快照：$($snap.Name)（$ageDays 天前采集）"
+if ($ageDays -gt 30) { Write-Host "  ⚠ 快照已 $ageDays 天未更新 —— 站点若已改版，本关是测不出来的" -ForegroundColor Yellow }
 Write-Host ""
 $rows | ForEach-Object { Write-Host $_ }
 Write-Host ""

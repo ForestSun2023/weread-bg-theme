@@ -4,17 +4,23 @@
 # 需要起无头浏览器的两关（功能回归 / 像素验证）**跑不了 CI** —— 它们依赖
 # Windows + Edge，还需要不入库的阅读页快照（快照含整章小说正文，属版权内容）。
 #
-# 剩下五关是纯静态的，直接在 Linux runner 上跑：
-#   1 封号风险审查 · 4 文档一致性 · 5 仓库卫生 · 6 死代码 · 7 体积
+# 剩下五关是纯静态的，直接在 Linux runner 上跑。**一关一步**：
+#   Actions 的**原始日志要登录且有 actions:read 才能取**（匿名 403），
+#   但 **step 列表是公开可读的**（GET /repos/{o}/{r}/actions/runs/{id}/jobs）。
+#   所以一关一步 = 不登录也能立刻看出是哪一关挂了。教训来自接入 CI 那次排查。
 #
-# 为什么拆成两个 step：
-#   GitHub Actions 的**原始日志要登录且有 actions:read 才能取**，
-#   但 **step 列表是公开可读的**（`GET /repos/{o}/{r}/actions/runs/{id}/jobs`）。
-#   把第 1 关单独成步，就能不登录也看出「是哪一半挂了」。
+# 失败时还会把各关完整输出**贴成提交评论**（评论同样公开可读，粒度更细）。
 #
-# 为什么失败时还要贴提交评论：
-#   提交评论同样公开可读，能拿到**完整输出**（比 step 粒度细得多）。
-#   贴评论需要 `contents: write`，所以下面显式声明了最小权限。
+# ⚠️ 三个坑都踩过，别改回去：
+#   ① 采集输出必须用 `*>&1` 而不是 `2>&1` —— Write-Host 写的是**信息流**，
+#      `2>&1` 只合并错误流，会漏掉一大半内容（评论里只剩半份输出）。
+#   ② 采集要 try/catch + **先落盘再打印**。第一版写成先取输出再写文件，
+#      一个终止性错误就让后面全没跑，评论里只有「(没有输出)」，诊断通道白建。
+#   ③ 子脚本都要显式声明 $ErrorActionPreference（Actions 会注入 stop），
+#      否则出现「本地全过、CI 挂」。见 设计思路.md 第九节。
+#
+# 5 个采集步骤共用同一段脚本（YAML 锚点 &gateRun）。重复 5 份的下场本项目见过：
+# CSP 那次修复要在两个脚本里各改一遍，然后第三个脚本就分叉了。
 # ============================================================================
 name: 检查
 
@@ -35,45 +41,68 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 1 封号风险审查
+        id: gate1
         shell: pwsh
-        run: ./工具/安全审查.ps1
-
-      - name: 4-7 文档一致性 / 仓库卫生 / 死代码 / 体积
-        id: check
-        shell: pwsh
-        # 先不中断：要让下一步有机会把输出贴出去
         continue-on-error: true
-        run: |
-          # 这一段的全部意义就是「无论如何都留下一份输出」。
-          # 第一版写成 $out = (& ... | Out-String) 然后才写文件：结果脚本那一行抛了
-          # 终止性错误，后面全没执行 → 评论里只有「(没有输出)」，诊断通道等于白建。
-          # 所以：try/catch 兜住 + 先落盘再打印。
+        env: { GATE: '1', SCRIPT: '安全审查.ps1' }
+        run: &gateRun |
           $ErrorActionPreference = 'Continue'
           $code = 99
-          try {
-            $out = (& ./工具/交付检查.ps1 -SkipRegression 2>&1 | Out-String)
-            $code = $LASTEXITCODE
-            if (-not $out) { $out = '(脚本没有产生任何输出)' }
-          } catch {
-            $out = "调用交付检查时抛异常：`n$_`n`n$($_.ScriptStackTrace)"
-          }
-          "退出码 = $code" | Set-Content -Path check-output.txt -Encoding utf8
-          $out | Add-Content -Path check-output.txt
-          Get-Content check-output.txt -Raw | Write-Host
+          try { $out = (& "./工具/$env:SCRIPT" *>&1 | Out-String); $code = $LASTEXITCODE }
+          catch { $out = "抛异常：`n$_`n$($_.ScriptStackTrace)" }
+          "退出码 = $code" | Set-Content "gate$env:GATE.txt" -Encoding utf8
+          $out | Add-Content "gate$env:GATE.txt"
+          Get-Content "gate$env:GATE.txt" -Raw | Write-Host
 
-      - name: 失败时把完整输出贴到提交评论
-        # ⚠️ 用 steps.check.outcome 而不是 failure()：
-        #    上一步带 continue-on-error，failure() 不会为它触发。
-        if: steps.check.outcome == 'failure' && github.event_name == 'push'
+      - name: 4 文档一致性
+        id: gate4
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '4', SCRIPT: '关卡-文档一致性.ps1' }
+        run: *gateRun
+
+      - name: 5 仓库卫生
+        id: gate5
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '5', SCRIPT: '关卡-仓库卫生.ps1' }
+        run: *gateRun
+
+      - name: 6 死代码
+        id: gate6
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '6', SCRIPT: '关卡-死代码.ps1' }
+        run: *gateRun
+
+      - name: 7 体积
+        id: gate7
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '7', SCRIPT: '关卡-体积.ps1' }
+        run: *gateRun
+
+      - name: 失败时把各关完整输出贴到提交评论
+        # ⚠️ 用 steps.<id>.outcome 而不是 failure()：上面每步都带 continue-on-error，
+        #    failure() 不会为它们触发。
+        if: |
+          github.event_name == 'push' && (
+            steps.gate1.outcome == 'failure' || steps.gate4.outcome == 'failure' ||
+            steps.gate5.outcome == 'failure' || steps.gate6.outcome == 'failure' ||
+            steps.gate7.outcome == 'failure')
         continue-on-error: true      # 贴不上去也不该成为失败原因
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $raw = if (Test-Path check-output.txt) { Get-Content check-output.txt -Raw } else { '(没有输出)' }
-          # 用 4 空格缩进做代码块，避免在 PowerShell 字符串里拼 Markdown 围栏
-          $body = ($raw -split "`n" | ForEach-Object { "    $_" }) -join "`n"
-          $text = "❌ 静态关卡未通过`n`n- 提交：${{ github.sha }}`n- 运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`n`n<details><summary>交付检查的完整输出</summary>`n`n$body`n`n</details>"
+          $parts = @()
+          foreach ($g in 1,4,5,6,7) {
+            $f = "gate$g.txt"
+            if (-not (Test-Path $f)) { continue }
+            $indented = ((Get-Content $f -Raw) -split "`n" | ForEach-Object { "    $_" }) -join "`n"
+            $parts += "### 关卡 $g`n$indented"
+          }
+          $text = "❌ 静态关卡未通过`n`n- 提交：${{ github.sha }}`n- 运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`n`n<details><summary>各关卡完整输出</summary>`n`n" + ($parts -join "`n`n") + "`n`n</details>"
           $payload = @{ body = $text } | ConvertTo-Json -Depth 4
           Invoke-RestMethod -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload `
             -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/commits/${{ github.sha }}/comments" `
@@ -82,5 +111,9 @@ jobs:
       - name: 让 job 真正失败
         # continue-on-error 会把整 job 的结论变成 success —— 那样徽标就在撒谎，这里补一刀。
         # 用 always() 保证即使上面贴评论那步自己挂了，这一步照样执行。
-        if: always() && steps.check.outcome == 'failure'
+        if: |
+          always() && (
+            steps.gate1.outcome == 'failure' || steps.gate4.outcome == 'failure' ||
+            steps.gate5.outcome == 'failure' || steps.gate6.outcome == 'failure' ||
+            steps.gate7.outcome == 'failure')
         run: exit 1

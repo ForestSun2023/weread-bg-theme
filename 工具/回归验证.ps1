@@ -345,6 +345,10 @@ $report = @()
 
 foreach ($snap in $Snapshot) {
   $name = Split-Path $snap -Leaf
+  # 快照是「冻结的副本」：站点改版后这一关照样全绿，所以必须把快照年龄摆出来。
+  $ageDays = [int]((Get-Date) - (Get-Item $snap).LastWriteTime).TotalDays
+  Write-Host ("  快照 {0}（{1} 天前采集）" -f $name, $ageDays)
+  if ($ageDays -gt 30) { Write-Host "  ⚠ 快照已 $ageDays 天未更新 —— 站点若已改版，本关是测不出来的" -ForegroundColor Yellow }
   $text = Get-Content $snap -Raw -Encoding UTF8
   # ⚠️ 必须摘掉快照自带的 CSP。
   # SingleFile 把站点的 <meta http-equiv=content-security-policy> 原样存下来了，内容是
