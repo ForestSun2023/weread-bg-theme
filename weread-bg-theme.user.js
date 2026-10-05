@@ -2,20 +2,21 @@
 // @name         微信读书网页版 · 背景颜色主题
 // @name:zh-CN   微信读书网页版 · 背景颜色主题
 // @namespace    https://github.com/ForestSun2023
-// @version      3.3.0
+// @version      3.4.0
 // @description  给微信读书网页版阅读页补上手机 App 才有的「亮度 / 颜色 / 背景」功能：白天三色（白 / 米黄 / 青绿）× 五种纸张背景。白天/黑夜沿用站点原生的「深色」按钮，黑夜模式完全用官方原装外观。
 // @author       ForestSun
 // @license      MIT
 // @homepageURL  https://github.com/ForestSun2023/weread-bg-theme
 // @supportURL   https://github.com/ForestSun2023/weread-bg-theme/issues
-// @icon         https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/assets/icon-96.png
+// @icon         https://cdn.jsdelivr.net/gh/ForestSun2023/weread-bg-theme@main/assets/icon-96.png
 // @match        https://weread.qq.com/web/reader/*
 // @match        https://weread.qq.com/web/*
 // @run-at       document-idle
 // @grant        none
 // @noframes
-// @downloadURL  https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js
-// @updateURL    https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js
+// @downloadURL  https://cdn.jsdelivr.net/gh/ForestSun2023/weread-bg-theme@main/weread-bg-theme.user.js
+// @updateURL    https://cdn.jsdelivr.net/gh/ForestSun2023/weread-bg-theme@main/weread-bg-theme.user.js
+// 说明：主页与反馈走 GitHub；图标和更新地址走 jsDelivr CDN（国内可直连）。
 // ==/UserScript==
 
 /*
@@ -503,6 +504,31 @@ html[data-wrbg] .reader_float_panel_container {
     return bad.join('；');
   }
 
+  // 把自检结果**变成用户看得见的信号**。
+  // 为什么必须这样做：站点改版的危害是「静默失效」—— 按钮还在、控制台不报错，
+  // 但颜色就是不生效，而用户只会以为「这脚本坏了」然后卸载，作者却收不到任何反馈。
+  // 本项目的全部测试都跑在**冻结的快照**上，站点真改版了测试照样全绿，
+  // 所以「让用户能看见」是唯一可用的漂移探测手段。
+  // 实现上只改颜色、不动布局：图标本身是 stroke="currentColor"，改 color 即可。
+  function markDriftWarning(bad) {
+    const host = document.querySelector('.wrbg-theme-host');
+    if (!host) return;
+    const btn = host.querySelector('button');
+    const tip = host.querySelector('.wr_tooltip_item');
+    if (!btn) return;
+    if (bad) {
+      host.setAttribute('data-wrbg-warn', '1');
+      btn.style.color = '#e5484d';
+      btn.title = '⚠ 主题未生效，微信读书可能已改版（运行 工具/weread-probe2.js 可生成反馈报告）';
+      if (tip) tip.textContent = '⚠ 主题未生效';
+    } else {
+      host.removeAttribute('data-wrbg-warn');
+      btn.style.removeProperty('color');
+      btn.title = '背景';
+      if (tip) tip.textContent = '背景';
+    }
+  }
+
   let selfCheckTimer = null;
   let selfCheckWarned = false;
 
@@ -512,6 +538,7 @@ html[data-wrbg] .reader_float_panel_container {
     // 所以不需要「连测两次确认」那一套。
     selfCheckTimer = setTimeout(() => {
       const bad = themeMismatch();
+      markDriftWarning(bad);                             // 不只写 Console，要让用户看见
       if (!bad) { selfCheckWarned = false; return; }     // 恢复正常 → 下次还能再报
       if (selfCheckWarned) return;                       // 同一个问题不刷屏
       selfCheckWarned = true;

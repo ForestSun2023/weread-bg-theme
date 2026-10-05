@@ -1,7 +1,7 @@
 # 微信读书网页版 · 背景颜色主题
 
 [![安装](https://img.shields.io/badge/安装-Tampermonkey-2ea44f)](https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js)
-![版本](https://img.shields.io/badge/版本-3.3.0-blue)
+![版本](https://img.shields.io/badge/版本-3.4.0-blue)
 ![检查](https://github.com/ForestSun2023/weread-bg-theme/actions/workflows/check.yml/badge.svg)
 ![许可](https://img.shields.io/github/license/ForestSun2023/weread-bg-theme?label=许可)
 ![最近提交](https://img.shields.io/github/last-commit/ForestSun2023/weread-bg-theme?label=最近提交)
