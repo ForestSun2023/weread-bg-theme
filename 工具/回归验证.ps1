@@ -428,6 +428,10 @@ $harness = @'
 '@
 
 $js = Get-Content $ScriptPath -Raw -Encoding UTF8
+# 注入前先清掉夹具里可能残留的上一次 UI（见 工具/夹具预清理.js 里的说明）。
+$preclean = Get-Content (Join-Path $PSScriptRoot '夹具预清理.js') -Raw -Encoding UTF8
+# 拼进同一个 <script>，保证预清理先于用户脚本执行。
+$js = $preclean + "`n" + $js
 
 # ---------------------------------------------------------------- 启服务器
 $job = Start-Job -ScriptBlock {
@@ -456,7 +460,7 @@ foreach ($snap in $Snapshot) {
   # 页面里任何 fetch/XHR 都被浏览器掐掉，诊断结果永远回不来。
   # 症状极具迷惑性：断言其实全跑完了（截图上黄色诊断框里全是 PASS），只是回传被拦，
   # 外面只看到「拿不到诊断结果」，连 beacon 都发不出。本地测试夹具，摘掉无副作用。
-  $text = $text -replace '<meta[^>]*Content-Security-Policy[^>]*>', ''
+  $text = $text -replace '(?i)<meta[^>]*content-security-policy[^>]*>', ''
   $label = if ($text -match 'wr_horizontalReader') { '双栏/横向' } else { '纵向/单栏' }
   $page = Join-Path $Tmp ('web\reader\' + [System.IO.Path]::GetFileNameWithoutExtension($snap) + '.html')
   [System.IO.File]::WriteAllText($page, $text + "`n<script>`n" + $js + "`n</script>`n" + $harness,
@@ -473,7 +477,7 @@ foreach ($snap in $Snapshot) {
   Remove-Item $repFile, $throw -Force -ErrorAction SilentlyContinue
   Start-Process -FilePath $Edge -ErrorAction SilentlyContinue -ArgumentList @(
     '--headless=old', '--disable-gpu', '--no-sandbox', '--no-first-run', '--hide-scrollbars',
-    "--user-data-dir=$Tmp\profile", '--window-size=1400,900', '--virtual-time-budget=30000',
+    "--user-data-dir=$Tmp\profile", '--window-size=1400,900', '--virtual-time-budget=90000',
     "--screenshot=$throw", $url)
 
   $n = 0

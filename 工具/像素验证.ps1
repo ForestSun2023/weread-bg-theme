@@ -94,10 +94,14 @@ $inject = @'
 
 $page = Join-Path $Tmp 'web\reader\p.html'
 $js = Get-Content $ScriptPath -Raw -Encoding UTF8
+# 注入前先清掉夹具里可能残留的上一次 UI（见 工具/夹具预清理.js 里的说明）。
+$preclean = Get-Content (Join-Path $PSScriptRoot '夹具预清理.js') -Raw -Encoding UTF8
+# 拼进同一个 <script>，保证预清理先于用户脚本执行。
+$js = $preclean + "`n" + $js
 # 摘掉快照自带的 CSP（`default-src 'none'` 且无 connect-src）。
 # 这里不靠 fetch 回传，理论上不受影响；但顺手摘掉，免得以后往页内加通信时再踩一次
 #（回归验证就是这么被坑的：断言全跑完，回传被 CSP 拦掉，外面只看到「拿不到诊断结果」）。
-$snapText = (Get-Content $snap.FullName -Raw -Encoding UTF8) -replace '<meta[^>]*Content-Security-Policy[^>]*>', ''
+$snapText = (Get-Content $snap.FullName -Raw -Encoding UTF8) -replace '(?i)<meta[^>]*content-security-policy[^>]*>', ''
 # 注意 $js 必须包在 <script> 里 —— 直接贴进页面只会被当成文本，脚本压根不执行
 [System.IO.File]::WriteAllText($page,
   $snapText + "`n<script>`n" + $js + "`n</script>`n" + $inject,
