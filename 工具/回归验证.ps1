@@ -107,10 +107,12 @@ $harness = @'
     if(!d){ d=document.createElement('pre'); d.id='__diag'; document.documentElement.appendChild(d); }
     d.textContent=rep;
     try{ fetch('/report',{method:'POST',body:rep}); }catch(e){}
+  }
 
   // ⚠️ 整个断言过程必须包在 try 里。
   // 这里出过事故：某条断言对着 null 调方法抛异常 → 直接跳出 async IIFE →
-      // 排查了半天才知道是断言自己崩了。所以现在要求：抛异常也必须出一份报告，把栈一起写进去。
+  // finish() 永远不执行 → 报告发不出来 → 外面只看到「拿不到诊断结果」，
+  // 排查了半天才知道是断言自己崩了。所以现在要求：抛异常也必须出一份报告，把栈一起写进去。
   try {
   // --- 运行时证明：脚本不产生任何网络请求 ---
   // 第 1 关是**静态**扫字符串，扫不到 window['fe'+'tch'] 这种间接写法，
@@ -475,7 +477,7 @@ foreach ($snap in $Snapshot) {
   Remove-Item $repFile, $throw -Force -ErrorAction SilentlyContinue
   Start-Process -FilePath $Edge -ErrorAction SilentlyContinue -ArgumentList @(
     '--headless=old', '--disable-gpu', '--no-sandbox', '--no-first-run', '--hide-scrollbars',
-    "--user-data-dir=$Tmp\profile", '--window-size=1400,900', '--virtual-time-budget=30000',
+    "--user-data-dir=$Tmp\profile", '--window-size=1400,900', '--virtual-time-budget=90000',
     "--screenshot=$throw", $url)
 
   $n = 0

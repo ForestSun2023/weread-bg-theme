@@ -1,11 +1,26 @@
 # ============================================================================
-# CI：跑静态检查（Linux 上就能跑，见 工具/交付检查.ps1 的 -SkipRegression）
+# 静态关卡 CI
 # ----------------------------------------------------------------------------
-# 需要起无头浏览器的两关（功能回归 / 像素验证）跑不了 CI —— 它们依赖 Windows + Edge
-# 和**不入库**的阅读页快照（快照含整章小说正文）。
+# 需要起无头浏览器的两关（功能回归 / 像素验证）**跑不了 CI** —— 它们依赖
+# Windows + Edge，还需要不入库的阅读页快照（快照含整章小说正文，属版权内容）。
 #
-# 推送后顺手让 jsDelivr 刷新 @main：它对分支引用有缓存，而脚本元数据的
-# @updateURL/@downloadURL 都指向 @main —— 不刷的话用户最多要等缓存过期才拿到更新。
+# 剩下五关是纯静态的，直接在 Linux runner 上跑。**一关一步**：
+#   Actions 的**原始日志要登录且有 actions:read 才能取**（匿名 403），
+#   但 **step 列表是公开可读的**（GET /repos/{o}/{r}/actions/runs/{id}/jobs）。
+#   所以一关一步 = 不登录也能立刻看出是哪一关挂了。教训来自接入 CI 那次排查。
+#
+# 失败时还会把各关完整输出**贴成提交评论**（评论同样公开可读，粒度更细）。
+#
+# ⚠️ 三个坑都踩过，别改回去：
+#   ① 采集输出必须用 `*>&1` 而不是 `2>&1` —— Write-Host 写的是**信息流**，
+#      `2>&1` 只合并错误流，会漏掉一大半内容（评论里只剩半份输出）。
+#   ② 采集要 try/catch + **先落盘再打印**。第一版写成先取输出再写文件，
+#      一个终止性错误就让后面全没跑，评论里只有「(没有输出)」，诊断通道白建。
+#   ③ 子脚本都要显式声明 $ErrorActionPreference（Actions 会注入 stop），
+#      否则出现「本地全过、CI 挂」。见 设计思路.md 第九节。
+#
+# 5 个采集步骤共用同一段脚本（YAML 锚点 &gateRun）。重复 5 份的下场本项目见过：
+# CSP 那次修复要在两个脚本里各改一遍，然后第三个脚本就分叉了。
 # ============================================================================
 name: 检查
 
@@ -15,26 +30,139 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write        # 只用于失败时贴提交评论
+
 jobs:
   static:
-    name: 静态检查
+    name: 静态关卡（五关）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: 交付检查（跳过需要浏览器的两关）
+      - name: 1 封号风险审查
+        id: gate1
         shell: pwsh
-        run: ./工具/交付检查.ps1 -SkipRegression
+        continue-on-error: true
+        env: { GATE: '1', SCRIPT: '安全审查.ps1' }
+        run: &gateRun |
+          $ErrorActionPreference = 'Continue'
+          $code = 99
+          try { $out = (& "./工具/$env:SCRIPT" *>&1 | Out-String); $code = $LASTEXITCODE }
+          catch { $out = "抛异常：`n$_`n$($_.ScriptStackTrace)" }
+          "退出码 = $code" | Set-Content "gate$env:GATE.txt" -Encoding utf8
+          $out | Add-Content "gate$env:GATE.txt"
+          Get-Content "gate$env:GATE.txt" -Raw | Write-Host
 
-      - name: 让 jsDelivr 刷新 @main
+      - name: 4 文档一致性
+        id: gate4
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '4', SCRIPT: '关卡-文档一致性.ps1' }
+        run: *gateRun
+
+      - name: 5 仓库卫生
+        id: gate5
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '5', SCRIPT: '关卡-仓库卫生.ps1' }
+        run: *gateRun
+
+      - name: 6 死代码
+        id: gate6
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '6', SCRIPT: '关卡-死代码.ps1' }
+        run: *gateRun
+
+      - name: 7 体积
+        id: gate7
+        shell: pwsh
+        continue-on-error: true
+        env: { GATE: '7', SCRIPT: '关卡-体积.ps1' }
+        run: *gateRun
+
+      - name: 发布：自动打 tag + 建 Release
+        # 只在 push、且五道关卡全过时做。版本化 CDN 地址（…@v3.5.0/…）依赖 tag，
+        # 以前打 tag、写 Release 全靠人记得 —— 现在不用了。
+        # continue-on-error：发布是附加动作，API 抖动不该把构建判红。
+        if: |
+          github.event_name == 'push' &&
+          steps.gate1.outcome == 'success' && steps.gate4.outcome == 'success' &&
+          steps.gate5.outcome == 'success' && steps.gate6.outcome == 'success' &&
+          steps.gate7.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./工具/发布.ps1
+      - name: 失败时把各关完整输出贴到提交评论
+        # ⚠️ 用 steps.<id>.outcome 而不是 failure()：上面每步都带 continue-on-error，
+        #    failure() 不会为它们触发。
+        if: |
+          github.event_name == 'push' && (
+            steps.gate1.outcome == 'failure' || steps.gate4.outcome == 'failure' ||
+            steps.gate5.outcome == 'failure' || steps.gate6.outcome == 'failure' ||
+            steps.gate7.outcome == 'failure')
+        continue-on-error: true      # 贴不上去也不该成为失败原因
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $parts = @()
+          foreach ($g in 1,4,5,6,7) {
+            $f = "gate$g.txt"
+            if (-not (Test-Path $f)) { continue }
+            $indented = ((Get-Content $f -Raw) -split "`n" | ForEach-Object { "    $_" }) -join "`n"
+            $parts += "### 关卡 $g`n$indented"
+          }
+          $text = "❌ 静态关卡未通过`n`n- 提交：${{ github.sha }}`n- 运行：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`n`n<details><summary>各关卡完整输出</summary>`n`n" + ($parts -join "`n`n") + "`n`n</details>"
+          $payload = @{ body = $text } | ConvertTo-Json -Depth 4
+          Invoke-RestMethod -Method Post -ContentType 'application/json; charset=utf-8' -Body $payload `
+            -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/commits/${{ github.sha }}/comments" `
+            -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+
+      - name: 让 jsDelivr 立刻刷新 @main
+        # jsDelivr 对**分支引用**有缓存 —— 实测 @main 曾落后好几个版本（推了 3.5.0 它还在发 3.4.1）。
+        # 元数据的 @updateURL/@downloadURL 都指向 @main，所以不刷的话用户最多要等缓存过期
+        # 才拿到更新。purge 是一次 GET，实测立刻生效。失败不影响交付（缓存自然会过期）。
         if: github.event_name == 'push'
         continue-on-error: true
         shell: pwsh
         run: |
           foreach ($p in @('weread-bg-theme.user.js','assets/icon-96.png')) {
             try {
-              $r = Invoke-RestMethod -TimeoutSec 30 -Headers @{'User-Agent'='ci'} `
+              $r = Invoke-RestMethod -TimeoutSec 30 -Headers @{'User-Agent'='dsh-ci'} `
                 -Uri "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$p"
               Write-Host "purge $p -> $($r.status)"
             } catch { Write-Host "purge $p 失败（不影响交付）：$($_.Exception.Message)" }
           }
+      - name: 让 job 真正失败
+        # continue-on-error 会把整 job 的结论变成 success —— 那样徽标就在撒谎，这里补一刀。
+        # 用 always() 保证即使上面贴评论那步自己挂了，这一步照样执行。
+        if: |
+          always() && (
+            steps.gate1.outcome == 'failure' || steps.gate4.outcome == 'failure' ||
+            steps.gate5.outcome == 'failure' || steps.gate6.outcome == 'failure' ||
+            steps.gate7.outcome == 'failure')
+        run: exit 1
+
+  # ---------------------------------------------------------------- 5.1 解析
+  # 工具脚本特意写了「优先 pwsh，没有就退回 Windows PowerShell 5.1」的回退
+  # （$ShellExe），但上面的 job 只跑 Linux + pwsh 7 —— 这条宣称从没被实测过。
+  # 本项目最怕的正是「宣称」与「实测」不一致（找 CI 挂的原因时已经吃过一回）。
+  win51:
+    name: Windows PowerShell 5.1 解析
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 用 5.1 的解析器逐个检查工具脚本
+        # ⚠️ 这个 run: 块**必须保持纯 ASCII**（下面这行只有一个路径例外，它由 pwsh 7 解码）。
+        #    GitHub 把 run: 块写成 UTF-8 **无 BOM**，而 5.1 对无 BOM 的脚本按 ANSI 解码 ——
+        #    中文会变乱码，连字符串的结束引号都被吃掉，步骤直接语法错。实测报错：
+        #      The string is missing the terminator: "
+        #    所以 5.1 的步骤只「启动 5.1 + 指向一个带 BOM 的仓库脚本」，逻辑全在那里面。
+        #    这条规矩由 工具/关卡-仓库卫生.ps1 自动守着。
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File ./工具/检查5.1解析.ps1
