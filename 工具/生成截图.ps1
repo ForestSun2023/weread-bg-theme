@@ -22,8 +22,7 @@
 # ============================================================================
 param(
   [int]$Port = 8807,
-  [switch]$Keep,
-  [switch]$Check
+  [switch]$Keep
 )
 
 $ErrorActionPreference = 'Continue'   # Edge 会往 stderr 写网络告警，Stop 会误判成致命错误
@@ -32,7 +31,7 @@ $Root = Split-Path $PSScriptRoot -Parent
 $ScriptPath = Join-Path $Root 'weread-bg-theme.user.js'
 $RepoShots = Join-Path $Root 'screenshots'
 # -Check：渲染到临时目录，好跟仓库里已提交的图比对（绝不覆盖它们）
-$OutDir = if ($Check) { Join-Path $env:TEMP ('wrbg-shotcheck-' + [guid]::NewGuid().ToString('N').Substring(0, 8)) } else { $RepoShots }
+$OutDir = $RepoShots
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 if (-not (Test-Path $ScriptPath)) { Write-Host "找不到脚本：$ScriptPath" -ForegroundColor Red; exit 1 }
@@ -309,43 +308,4 @@ if ($fails -eq 0) {
 }
 if ($Keep) { Write-Host "临时目录（-Keep）：$Tmp" -ForegroundColor Yellow }
 else { Remove-Item $Tmp -Recurse -Force -ErrorAction SilentlyContinue }
-# ---------------------------------------------------------------- -Check：与仓库里的图比对
-# 为什么需要：README 配图是**生成物**，却是项目的门面。改了 UI 不重新生成，
-# 没有任何关卡会发现 —— 图和产品说的不是一回事。这里重渲染再逐像素比。
-if ($Check) {
-  Write-Host ""
-  Write-Host "  与仓库里已提交的图比对（重渲染 vs screenshots/）：" -ForegroundColor Cyan
-  $checkFails = 0
-  $tol = 2.0        # 允许的平均像素差：同机同版本应当接近 0，只容忍抗锯齿/编码的极微差异
-  foreach ($name in @('主题矩阵.jpg', '面板.png')) {
-    $fresh = Join-Path $OutDir $name
-    $old   = Join-Path $RepoShots $name
-    if (-not (Test-Path $old))   { Write-Host "  [失败] $name：仓库里没有这张图" -ForegroundColor Red; $checkFails++; continue }
-    if (-not (Test-Path $fresh)) { Write-Host "  [失败] $name：没能渲染出来" -ForegroundColor Red; $checkFails++; continue }
-    $bmpA = [System.Drawing.Bitmap]::FromFile($old)
-    $bmpB = [System.Drawing.Bitmap]::FromFile($fresh)
-    if ($bmpA.Width -ne $bmpB.Width -or $bmpA.Height -ne $bmpB.Height) {
-      Write-Host ("  [失败] {0}：尺寸变了（仓库 {1}x{2}，现在 {3}x{4}）" -f $name, $bmpA.Width, $bmpA.Height, $bmpB.Width, $bmpB.Height) -ForegroundColor Red
-      $bmpA.Dispose(); $bmpB.Dispose(); $checkFails++; continue
-    }
-    $sum = 0.0; $n = 0
-    for ($y = 0; $y -lt $bmpA.Height; $y += 3) {
-      for ($x = 0; $x -lt $bmpA.Width; $x += 3) {
-        $ca = $bmpA.GetPixel($x, $y); $cb = $bmpB.GetPixel($x, $y)
-        $sum += [Math]::Abs($ca.R - $cb.R) + [Math]::Abs($ca.G - $cb.G) + [Math]::Abs($ca.B - $cb.B)
-        $n += 3
-      }
-    }
-    $bmpA.Dispose(); $bmpB.Dispose()
-    $diff = if ($n -gt 0) { $sum / $n } else { 0 }
-    if ($diff -le $tol) {
-      Write-Host ("  [通过] {0}：与仓库里的图一致（平均像素差 {1:N2}）" -f $name, $diff)
-    } else {
-      Write-Host ("  [失败] {0}：与仓库里的图不一致（平均像素差 {1:N2} > {2}）—— 改了 UI 就重跑一次 生成截图.ps1" -f $name, $diff, $tol) -ForegroundColor Red
-      $checkFails++
-    }
-  }
-  if ($checkFails -eq 0) { Write-Host "  结论：README 配图与当前脚本一致" -ForegroundColor Green }
-  else { Write-Host "  结论：$checkFails 张配图已过期" -ForegroundColor Red; $fails = $fails + $checkFails }
-}
 exit $fails

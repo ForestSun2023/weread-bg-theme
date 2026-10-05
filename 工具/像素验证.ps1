@@ -145,23 +145,23 @@ function Lum($t) { return [int](($t[0] + $t[1] + $t[2]) / 3) }
 
 # ---------------------------------------------------------------- 期望值（官方实测）
 $cases = @(
-  @{ c = 'white'; b = 'solid'; desc = '白·纯色  '; tol = 4 }
-  @{ c = 'white'; b = 'paper'; desc = '白·纸纹  '; tol = 5 }
-  @{ c = 'white'; b = 'plain'; desc = '白·素纸  '; tol = 6 }
-  @{ c = 'white'; b = 'cloud'; desc = '白·云    '; tol = 10; rise = 10 }
-  @{ c = 'white'; b = 'moon';  desc = '白·月    '; tol = 10; moonCheck = 1 }
+  @{ c = 'white'; b = 'solid'; desc = '白·纯色  '; tol = 4; bands = @(249, 249, 249) }
+  @{ c = 'white'; b = 'paper'; desc = '白·纸纹  '; tol = 5; bands = @(251, 251, 251) }
+  @{ c = 'white'; b = 'plain'; desc = '白·素纸  '; tol = 6; bands = @(245, 248, 247); moonRef = 2 }
+  @{ c = 'white'; b = 'cloud'; desc = '白·云    '; tol = 10; bands = @(213, 224, 235); moonRef = 12; rise = 10 }
+  @{ c = 'white'; b = 'moon';  desc = '白·月    '; tol = 10; bands = @(207, 220, 231); moonRef = 37 }
 
-  @{ c = 'sepia'; b = 'solid'; desc = '米黄·纯色'; tol = 4; warm = 1 }
-  @{ c = 'sepia'; b = 'paper'; desc = '米黄·纸纹'; tol = 8; warm = 1 }
-  @{ c = 'sepia'; b = 'plain'; desc = '米黄·素纸'; tol = 8; warm = 1 }
-  @{ c = 'sepia'; b = 'cloud'; desc = '米黄·云  '; tol = 10; rise = 6; warm = 1 }
-  @{ c = 'sepia'; b = 'moon';  desc = '米黄·月  '; tol = 12; moonCheck = 1 }
+  @{ c = 'sepia'; b = 'solid'; desc = '米黄·纯色'; tol = 4; bands = @(234, 234, 234); warm = 1 }
+  @{ c = 'sepia'; b = 'paper'; desc = '米黄·纸纹'; tol = 8; bands = @(229, 229, 226); warm = 1 }
+  @{ c = 'sepia'; b = 'plain'; desc = '米黄·素纸'; tol = 8; bands = @(243, 242, 239); moonRef = 1; warm = 1 }
+  @{ c = 'sepia'; b = 'cloud'; desc = '米黄·云  '; tol = 10; bands = @(222, 233, 231); moonRef = 1; rise = 6; warm = 1 }
+  @{ c = 'sepia'; b = 'moon';  desc = '米黄·月  '; tol = 12; bands = @(218, 199, 187); moonRef = 25 }
 
-  @{ c = 'green'; b = 'solid'; desc = '青绿·纯色'; tol = 4; greenish = 1 }
-  @{ c = 'green'; b = 'paper'; desc = '青绿·纸纹'; tol = 8; greenish = 1 }
-  @{ c = 'green'; b = 'plain'; desc = '青绿·素纸'; tol = 8 }
-  @{ c = 'green'; b = 'cloud'; desc = '青绿·云  '; tol = 8; greenish = 1 }
-  @{ c = 'green'; b = 'moon';  desc = '青绿·月  '; tol = 12; moonCheck = 1 }
+  @{ c = 'green'; b = 'solid'; desc = '青绿·纯色'; tol = 4; bands = @(209, 209, 209); greenish = 1 }
+  @{ c = 'green'; b = 'paper'; desc = '青绿·纸纹'; tol = 8; bands = @(230, 233, 229); greenish = 1 }
+  @{ c = 'green'; b = 'plain'; desc = '青绿·素纸'; tol = 8; bands = @(237, 236, 238) }
+  @{ c = 'green'; b = 'cloud'; desc = '青绿·云  '; tol = 8; bands = @(226, 228, 229); greenish = 1 }
+  @{ c = 'green'; b = 'moon';  desc = '青绿·月  '; tol = 12; bands = @(193, 229, 230); moonRef = 20 }
 
 )
 
