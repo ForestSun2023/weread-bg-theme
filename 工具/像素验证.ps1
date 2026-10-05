@@ -134,23 +134,23 @@ function Lum($t) { return [int](($t[0] + $t[1] + $t[2]) / 3) }
 
 # ---------------------------------------------------------------- 期望值（官方实测）
 $cases = @(
-  @{ c = 'white'; b = 'solid'; desc = '白·纯色  '; bands = @(248, 248, 248); tol = 4 }
-  @{ c = 'white'; b = 'paper'; desc = '白·纸纹  '; bands = @(251, 251, 251); tol = 5 }
-  @{ c = 'white'; b = 'plain'; desc = '白·素纸  '; bands = @(245, 248, 246); tol = 6 }
-  @{ c = 'white'; b = 'cloud'; desc = '白·云    '; bands = @(213, 224, 235); tol = 10; rise = 10 }
-  @{ c = 'white'; b = 'moon';  desc = '白·月    '; bands = @(207, 219, 231); tol = 10; moonRef = 37 }
+  @{ c = 'white'; b = 'solid'; desc = '白·纯色  '; tol = 4 }
+  @{ c = 'white'; b = 'paper'; desc = '白·纸纹  '; tol = 5 }
+  @{ c = 'white'; b = 'plain'; desc = '白·素纸  '; tol = 6 }
+  @{ c = 'white'; b = 'cloud'; desc = '白·云    '; tol = 10; rise = 10 }
+  @{ c = 'white'; b = 'moon';  desc = '白·月    '; tol = 10; moonCheck = 1 }
 
-  @{ c = 'sepia'; b = 'solid'; desc = '米黄·纯色'; bands = @(233, 233, 233); tol = 4; warm = 1 }
-  @{ c = 'sepia'; b = 'paper'; desc = '米黄·纸纹'; bands = @(228, 228, 226); tol = 8; warm = 1 }
-  @{ c = 'sepia'; b = 'plain'; desc = '米黄·素纸'; bands = @(242, 242, 238); tol = 8; warm = 1 }
-  @{ c = 'sepia'; b = 'cloud'; desc = '米黄·云  '; bands = @(222, 233, 230); tol = 10; rise = 6; warm = 1 }
-  @{ c = 'sepia'; b = 'moon';  desc = '米黄·月  '; bands = @(217, 199, 186); tol = 12; moonRef = 25 }
+  @{ c = 'sepia'; b = 'solid'; desc = '米黄·纯色'; tol = 4; warm = 1 }
+  @{ c = 'sepia'; b = 'paper'; desc = '米黄·纸纹'; tol = 8; warm = 1 }
+  @{ c = 'sepia'; b = 'plain'; desc = '米黄·素纸'; tol = 8; warm = 1 }
+  @{ c = 'sepia'; b = 'cloud'; desc = '米黄·云  '; tol = 10; rise = 6; warm = 1 }
+  @{ c = 'sepia'; b = 'moon';  desc = '米黄·月  '; tol = 12; moonCheck = 1 }
 
-  @{ c = 'green'; b = 'solid'; desc = '青绿·纯色'; bands = @(209, 209, 209); tol = 4; greenish = 1 }
-  @{ c = 'green'; b = 'paper'; desc = '青绿·纸纹'; bands = @(230, 232, 228); tol = 8; greenish = 1 }
-  @{ c = 'green'; b = 'plain'; desc = '青绿·素纸'; bands = @(237, 236, 238); tol = 8 }
-  @{ c = 'green'; b = 'cloud'; desc = '青绿·云  '; bands = @(226, 227, 228); tol = 8; greenish = 1 }
-  @{ c = 'green'; b = 'moon';  desc = '青绿·月  '; bands = @(192, 229, 229); tol = 12; moonRef = 20 }
+  @{ c = 'green'; b = 'solid'; desc = '青绿·纯色'; tol = 4; greenish = 1 }
+  @{ c = 'green'; b = 'paper'; desc = '青绿·纸纹'; tol = 8; greenish = 1 }
+  @{ c = 'green'; b = 'plain'; desc = '青绿·素纸'; tol = 8 }
+  @{ c = 'green'; b = 'cloud'; desc = '青绿·云  '; tol = 8; greenish = 1 }
+  @{ c = 'green'; b = 'moon';  desc = '青绿·月  '; tol = 12; moonCheck = 1 }
 
 )
 
@@ -173,6 +173,23 @@ $extraPairs = @($havePairs | Where-Object { $expectPairs -notcontains $_ })
 # ---------------------------------------------------------------- 逐格渲染 + 采样
 $fails = 0
 $rows = @()
+
+# 期望值不再内联手写：从「官方实测值.ps1」取 —— 那个文件记录了每个数字来自哪张官方截图，
+# 可用 工具/采样官方纹理.ps1 从图重算复核。**查不到条目 = 失败**（覆盖不全不能算通过）。
+. (Join-Path $PSScriptRoot '官方实测值.ps1')
+$missingOff = @()
+foreach ($cs in $cases) {
+  $off = @($official | Where-Object { $_.key -eq "$($cs.c)/$($cs.b)" })
+  if ($off.Count -eq 0) { $missingOff += "$($cs.c)/$($cs.b)"; continue }
+  $cs.bands = $off[0].bands
+  if ($cs.ContainsKey('moonCheck')) { $cs.moonRef = $off[0].moon }
+}
+if ($missingOff.Count -gt 0) {
+  $rows += "  FAIL  官方实测值  这些用例没有来源条目：$($missingOff -join ', ')"
+  $fails++
+} else {
+  $rows += "  PASS  官方实测值  $($cases.Count) 组期望值全部取自官方截图（带出处，可重算复核）"
+}
 
 if ($realColors.Count -lt 2 -or $realBgs.Count -le 1) {
   $rows += "  FAIL  覆盖自检  解析不出脚本的 COLORS/BACKGROUNDS（拿到 $($realColors.Count) 色 / $($realBgs.Count) 纹理）—— 自检本身失效了"

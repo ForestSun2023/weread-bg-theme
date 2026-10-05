@@ -117,3 +117,26 @@ jobs:
             steps.gate5.outcome == 'failure' || steps.gate6.outcome == 'failure' ||
             steps.gate7.outcome == 'failure')
         run: exit 1
+
+  # ---------------------------------------------------------------- 5.1 解析
+  # 工具脚本特意写了「优先 pwsh，没有就退回 Windows PowerShell 5.1」的回退
+  # （$ShellExe），但上面的 job 只跑 Linux + pwsh 7 —— 这条宣称从没被实测过。
+  # 本项目最怕的正是「宣称」与「实测」不一致（找 CI 挂的原因时已经吃过一回）。
+  win51:
+    name: Windows PowerShell 5.1 解析
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 用 5.1 的解析器逐个检查工具脚本
+        shell: powershell        # ← 就是 Windows PowerShell 5.1
+        run: |
+          $bad = 0
+          Get-ChildItem 工具/*.ps1 | ForEach-Object {
+            $e = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$e)
+            if ($e.Count) { Write-Host "FAIL $($_.Name): $($e[0].Message)"; $bad++ }
+            else { Write-Host "PASS $($_.Name)" }
+          }
+          if ($bad -gt 0) { Write-Host "有 $bad 个脚本在 5.1 下解析失败"; exit 1 }
+          Write-Host "全部脚本在 Windows PowerShell 5.1 下都能解析"

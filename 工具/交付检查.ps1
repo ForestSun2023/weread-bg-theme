@@ -118,7 +118,7 @@ if ($SkipPixel -or $SkipRegression) {
   $pxPass = ($pxOut | Select-String -Pattern '^\s+PASS').Count
   $pxFail = ($pxOut | Select-String -Pattern '^\s+FAIL').Count
   $pxOut | Select-String -Pattern 'FAIL|结论|快照' | ForEach-Object { Write-Host $_.Line }
-  Write-Host ("  {0} 项通过 / {1} 项未达标（15 格组合 + 一条覆盖自检）" -f $pxPass, $pxFail)
+  Write-Host ("  {0} 项通过 / {1} 项未达标（15 格组合 + 2 条自检）" -f $pxPass, $pxFail)
   if ($pxPass -eq 0) { Write-Host "  [ 失败 ] 一格都没渲染出来" -ForegroundColor Red; $failed++ }
   elseif (-not $pxOk) { $failed++ }
 }
@@ -199,8 +199,22 @@ $row = '| v{0} | {1} | {2:N0} | {3} | {4} | {5} | {6} | {7} | {8} |' -f `
   $(if ($hygIssues -eq 0) { '通过' } else { '**' + [Math]::Max(1, $hygIssues) + ' 项**' }),
   $(if ($auditOk) { '通过' } else { '**未通过**' }),
   $(if ($deadIssues -eq 0) { '通过' } else { '**' + [Math]::Max(1, $deadIssues) + ' 项**' })
-Add-Content $LogPath -Value $row -Encoding UTF8
-Write-Host "已写入审查记录：$LogPath" -ForegroundColor DarkGray
+# 一版一行：同版本重跑就**更新那一行**，不再追加。
+# 为什么改：重跑几遍就多几行 —— 41 行里只有 9 个版本，最多的一个版本占了 8 行；
+# 而且每次跑检查都把工作区弄脏一次（多一个无意义的 diff）。
+$logLines = @(Get-Content $LogPath -Encoding UTF8)
+$rowIdx = -1
+for ($k = $logLines.Count - 1; $k -ge 0; $k--) {
+  if ($logLines[$k] -match ('^\|\s*v' + [regex]::Escape($ver) + '\s*\|')) { $rowIdx = $k; break }
+}
+if ($rowIdx -ge 0) {
+  $logLines[$rowIdx] = $row
+  Set-Content $LogPath -Value $logLines -Encoding UTF8
+  Write-Host "已更新审查记录（v$ver 已有记录，原地更新）：$LogPath" -ForegroundColor DarkGray
+} else {
+  Add-Content $LogPath -Value $row -Encoding UTF8
+  Write-Host "已追加审查记录：$LogPath" -ForegroundColor DarkGray
+}
 Write-Host ""
 
 exit $failed
