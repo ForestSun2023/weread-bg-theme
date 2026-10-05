@@ -129,14 +129,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 用 5.1 的解析器逐个检查工具脚本
-        shell: powershell        # ← 就是 Windows PowerShell 5.1
-        run: |
-          $bad = 0
-          Get-ChildItem 工具/*.ps1 | ForEach-Object {
-            $e = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$e)
-            if ($e.Count) { Write-Host "FAIL $($_.Name): $($e[0].Message)"; $bad++ }
-            else { Write-Host "PASS $($_.Name)" }
-          }
-          if ($bad -gt 0) { Write-Host "有 $bad 个脚本在 5.1 下解析失败"; exit 1 }
-          Write-Host "全部脚本在 Windows PowerShell 5.1 下都能解析"
+        # ⚠️ 这个 run: 块**必须保持纯 ASCII**（下面这行只有一个路径例外，它由 pwsh 7 解码）。
+        #    GitHub 把 run: 块写成 UTF-8 **无 BOM**，而 5.1 对无 BOM 的脚本按 ANSI 解码 ——
+        #    中文会变乱码，连字符串的结束引号都被吃掉，步骤直接语法错。实测报错：
+        #      The string is missing the terminator: "
+        #    所以 5.1 的步骤只「启动 5.1 + 指向一个带 BOM 的仓库脚本」，逻辑全在那里面。
+        #    这条规矩由 工具/关卡-仓库卫生.ps1 自动守着。
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File ./工具/检查5.1解析.ps1
