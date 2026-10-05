@@ -41,10 +41,19 @@ if (-not $Edge) { Write-Host "找不到 Edge / Chrome，无法做 headless 渲�
 
 # ---------------------------------------------------------------- 找快照
 if (-not $Snapshot -or $Snapshot.Count -eq 0) {
-  $Snapshot = Get-ChildItem $Root -Filter *.html -File | Where-Object {
-    $head = Get-Content $_.FullName -TotalCount 40 -Encoding UTF8 -ErrorAction SilentlyContinue | Out-String
-    $head -match 'SingleFile' -and $head -match 'weread\.qq\.com'
-  } | ForEach-Object { $_.FullName }
+  # 快照优先从 `快照/` 取，取不到再退回仓库根目录。
+  # 为什么：位置以前写死在根目录，用户把快照放进子目录后就静默失效了 ——
+  # 「快照在哪」不该是一个硬编码假设。
+  $dirs = @((Join-Path $Root '快照'), $Root) | Where-Object { Test-Path $_ }
+  $found = @()
+  foreach ($d in $dirs) {
+    $found = @(Get-ChildItem $d -Filter *.html -File | Where-Object {
+      $head = Get-Content $_.FullName -TotalCount 40 -Encoding UTF8 -ErrorAction SilentlyContinue | Out-String
+      $head -match 'SingleFile' -and $head -match 'weread\.qq\.com'
+    })
+    if ($found.Count -gt 0) { break }
+  }
+  $Snapshot = $found | ForEach-Object { $_.FullName }
 }
 if (-not $Snapshot -or $Snapshot.Count -eq 0) {
   Write-Host "没找到可用于验证的页面快照（*.html，SingleFile 保存的阅读页）" -ForegroundColor Red
@@ -430,7 +439,11 @@ Start-Sleep -Seconds 2
 $totalFails = 0
 $report = @()
 
+# 测试页用 ASCII 序号名：直接拿快照原名（可能含中文/全角冒号/括号）会让 URL 失效，
+  # 表现是「拿不到诊断结果」，很容易误判成 CSP 或脚本坏了。
+  $snapIdx = 0
 foreach ($snap in $Snapshot) {
+  $snapIdx++
   $name = Split-Path $snap -Leaf
   # 快照是「冻结的副本」：站点改版后这一关照样全绿，所以必须把快照年龄摆出来。
   $ageDays = [int]((Get-Date) - (Get-Item $snap).LastWriteTime).TotalDays
@@ -464,7 +477,11 @@ foreach ($snap in $Snapshot) {
     "--screenshot=$throw", $url)
 
   $n = 0
-  while ($n++ -lt 150) {
+  # 上限原先按 150 次 × 400ms = 60 秒。快照的正文长度差别很大（这份是 19 MB、章节很长），
+# 60 秒不够时会表现成「拿不到诊断结果」，跟 CSP/脚本坏了长得一模一样 —— 很难区分。
+# 放宽到 400 次（160 秒），并把实际耗时打出来，省得下次再猜。
+$sw = [Diagnostics.Stopwatch]::StartNew()
+while ($n++ -lt 400) {
     if (Test-Path $repFile) {
       $probe = Get-Content $repFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
       if ($probe -and $probe -match 'SUMMARY fails=') { break }
@@ -473,7 +490,7 @@ foreach ($snap in $Snapshot) {
   }
   $txt = Get-Content $repFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
   if (-not $txt -or $txt -notmatch 'SUMMARY fails=') {
-    $report += "【$label】$name`n  拿不到诊断结果（页面没跑完 / 服务没起来）"
+    $report += "【$label】$name`n  拿不到诊断结果（等了 $([int]$sw.Elapsed.TotalSeconds) 秒 / 页面没跑完 / 服务没起来）"
     $report += "`n  排查顺序：① 快照的 CSP 是否已摘掉（default-src 'none' 会拦掉 fetch）" +
                "`n            ② 用 -Keep 保留临时目录，把页面直接截图看黄色诊断框里有没有 PASS"
     $totalFails++

@@ -44,10 +44,17 @@ if (-not $Edge) { Write-Host "找不到 Edge / Chrome" -ForegroundColor Red; exi
 
 # ---------------------------------------------------------------- 找纵向快照
 # 只用纵向那个：双栏的 DOM 结构不同、几何基准不好统一，回归脚本已覆盖它的功能面
-$snap = Get-ChildItem $Root -Filter *.html -File | Where-Object {
-  $head = Get-Content $_.FullName -TotalCount 40 -Encoding UTF8 -ErrorAction SilentlyContinue | Out-String
-  $head -match 'SingleFile' -and $head -match 'weread\.qq\.com'
-} | Where-Object {
+# 位置以前写死在根目录；用户把快照放进 快照/ 后就静默失效了。这里两处都找，优先 快照/。
+$cand = @()
+foreach ($d in @((Join-Path $Root '快照'), $Root)) {
+  if (-not (Test-Path $d)) { continue }
+  $cand = @(Get-ChildItem $d -Filter *.html -File | Where-Object {
+    $head = Get-Content $_.FullName -TotalCount 40 -Encoding UTF8 -ErrorAction SilentlyContinue | Out-String
+    $head -match 'SingleFile' -and $head -match 'weread\.qq\.com'
+  })
+  if ($cand.Count -gt 0) { break }
+}
+$snap = $cand | Where-Object {
   -not ((Get-Content $_.FullName -TotalCount 400 -Encoding UTF8 -ErrorAction SilentlyContinue | Out-String) -match 'wr_horizontalReader')
 } | Select-Object -First 1
 if (-not $snap) { Write-Host "没找到纵向阅读页快照（*.html）" -ForegroundColor Red; exit 1 }

@@ -46,7 +46,8 @@ Get-ChildItem (Join-Path $Root '工具') -Filter *.ps1 -Recurse -ErrorAction Sil
 if ($isRepo) {
   $suspects = @()
   foreach ($pat in @('*.har', '*.cookies.txt', '.env', 'base.apk*', '*.apk', '*.html')) {
-    $suspects += Get-ChildItem $Root -Filter $pat -Force -File -ErrorAction SilentlyContinue
+    # 必须 -Recurse：只扫根目录的话，放进子目录的快照会被漏掉（这次就漏了 20 MB 小说正文）
+    $suspects += Get-ChildItem $Root -Filter $pat -Force -File -Recurse -ErrorAction SilentlyContinue
   }
   foreach ($d in @('_apk', '官方背景截图')) {
     $p = Join-Path $Root $d
