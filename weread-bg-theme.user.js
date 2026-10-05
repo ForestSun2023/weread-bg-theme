@@ -2,7 +2,7 @@
 // @name         微信读书网页版 · 背景颜色主题
 // @name:zh-CN   微信读书网页版 · 背景颜色主题
 // @namespace    https://github.com/ForestSun2023
-// @version      3.5.0
+// @version      4.0.0
 // @description  给微信读书网页版阅读页补上手机 App 才有的「亮度 / 颜色 / 背景」功能：白天三色（白 / 米黄 / 青绿）× 五种纸张背景。白天/黑夜沿用站点原生的「深色」按钮，黑夜模式完全用官方原装外观。
 // @author       ForestSun
 // @license      MIT

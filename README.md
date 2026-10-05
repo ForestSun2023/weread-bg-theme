@@ -1,7 +1,7 @@
 # 微信读书网页版 · 背景颜色主题
 
 [![安装](https://img.shields.io/badge/安装-Tampermonkey-2ea44f)](https://raw.githubusercontent.com/ForestSun2023/weread-bg-theme/main/weread-bg-theme.user.js)
-![版本](https://img.shields.io/badge/版本-3.5.0-blue)
+![版本](https://img.shields.io/badge/版本-4.0.0-blue)
 ![检查](https://github.com/ForestSun2023/weread-bg-theme/actions/workflows/check.yml/badge.svg)
 ![许可](https://img.shields.io/github/license/ForestSun2023/weread-bg-theme?label=许可)
 ![最近提交](https://img.shields.io/github/last-commit/ForestSun2023/weread-bg-theme?label=最近提交)
@@ -213,6 +213,16 @@ pwsh -File "工具\交付检查.ps1"     # 一条命令跑完全部八道关卡�
 `--wr-reader-render-*` 是输出不是输入、引擎没有行距/缩进概念）、官方配色的采样方法与实测表、
 每一次方案取舍的推导过程，以及一份**失败方案清单**（为什么「黑夜下自己刷一层黑」和
 「把站点钉在浅色 + 藏掉深色按钮」都行不通）。
+
+## 微信读书改版时怎么办
+
+脚本与站点 DOM 强耦合，站点改版就可能失效。**自检**发现失效时会把「背景」图标染红
+（**不会**乱改样式）—— 那时按这个顺序处理，通常很快能修好：
+
+1. 抓一份新的阅读页快照（SingleFile 存成 `.html`），放进 `快照/`
+2. `pwsh -File "工具\交付检查.ps1"` —— 回归/像素会指出哪个选择器或哪段观感变了
+3. 对着快照改 `weread-bg-theme.user.js` 里的选择器，重跑直到全绿
+4. 版本号 +1（四处：脚本 / README 徽标 / CHANGELOG / 使用说明），`git tag vX.Y.Z` 推上去
 
 ## 许可
 
