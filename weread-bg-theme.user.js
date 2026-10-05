@@ -2,7 +2,7 @@
 // @name         微信读书网页版 · 背景颜色主题
 // @name:zh-CN   微信读书网页版 · 背景颜色主题
 // @namespace    https://github.com/ForestSun2023
-// @version      3.4.0
+// @version      3.4.1
 // @description  给微信读书网页版阅读页补上手机 App 才有的「亮度 / 颜色 / 背景」功能：白天三色（白 / 米黄 / 青绿）× 五种纸张背景。白天/黑夜沿用站点原生的「深色」按钮，黑夜模式完全用官方原装外观。
 // @author       ForestSun
 // @license      MIT
@@ -518,7 +518,10 @@ html[data-wrbg] .reader_float_panel_container {
     if (!btn) return;
     if (bad) {
       host.setAttribute('data-wrbg-warn', '1');
-      btn.style.color = '#e5484d';
+      // ⚠️ 必须带 !important：站点（或本脚本自己的 CSS）在某个布局下给按钮颜色加了
+      // !important，普通内联样式会被压掉 —— 实测双栏模式下图标根本没变红。
+      // 这是回归验证里新加的那条断言抓出来的：光靠人工看代码会以为它已经生效。
+      btn.style.setProperty('color', '#e5484d', 'important');
       btn.title = '⚠ 主题未生效，微信读书可能已改版（运行 工具/weread-probe2.js 可生成反馈报告）';
       if (tip) tip.textContent = '⚠ 主题未生效';
     } else {
