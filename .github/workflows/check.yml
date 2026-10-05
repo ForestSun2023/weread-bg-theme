@@ -108,6 +108,21 @@ jobs:
             -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/commits/${{ github.sha }}/comments" `
             -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
 
+      - name: 让 jsDelivr 立刻刷新 @main
+        # jsDelivr 对**分支引用**有缓存 —— 实测 @main 曾落后好几个版本（推了 3.5.0 它还在发 3.4.1）。
+        # 元数据的 @updateURL/@downloadURL 都指向 @main，所以不刷的话用户最多要等缓存过期
+        # 才拿到更新。purge 是一次 GET，实测立刻生效。失败不影响交付（缓存自然会过期）。
+        if: github.event_name == 'push'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          foreach ($p in @('weread-bg-theme.user.js','assets/icon-96.png')) {
+            try {
+              $r = Invoke-RestMethod -TimeoutSec 30 -Headers @{'User-Agent'='dsh-ci'} `
+                -Uri "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$p"
+              Write-Host "purge $p -> $($r.status)"
+            } catch { Write-Host "purge $p 失败（不影响交付）：$($_.Exception.Message)" }
+          }
       - name: 让 job 真正失败
         # continue-on-error 会把整 job 的结论变成 success —— 那样徽标就在撒谎，这里补一刀。
         # 用 always() 保证即使上面贴评论那步自己挂了，这一步照样执行。
