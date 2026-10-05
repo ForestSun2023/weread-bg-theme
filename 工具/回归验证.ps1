@@ -105,6 +105,24 @@ $harness = @'
   // finish() 永远不执行 → 报告发不出来 → 外面只看到「拿不到诊断结果」，
   // 排查了半天才知道是断言自己崩了。所以现在要求：抛异常也必须出一份报告，把栈一起写进去。
   try {
+  // --- 运行时证明：脚本不产生任何网络请求 ---
+  // 第 1 关是**静态**扫字符串，扫不到 window['fe'+'tch'] 这种间接写法，
+  // 也扫不到「脚本碰了某个属性，导致站点自己发请求」。这里在页面里挂拦截器，
+  // 从脚本就绪那一刻开始记，最后断言整段交互过程**一个请求都没有**。
+  // 探针自己的 /report 要排除（那是 harness 的，不是脚本的）。
+  var netCalls = [];
+  (function(){
+    var skip = function(u){ return String(u == null ? '' : (u.url || u)).indexOf('/report') >= 0; };
+    if (window.fetch) { var of = window.fetch;
+      window.fetch = function(u){ if (!skip(u)) netCalls.push('fetch ' + (u && (u.url || u))); return of.apply(this, arguments); }; }
+    if (window.XMLHttpRequest) { var oo = window.XMLHttpRequest.prototype.open;
+      window.XMLHttpRequest.prototype.open = function(m, u){ if (!skip(u)) netCalls.push('xhr ' + m + ' ' + u); return oo.apply(this, arguments); }; }
+    if (navigator.sendBeacon) { var ob = navigator.sendBeacon.bind(navigator);
+      navigator.sendBeacon = function(u){ if (!skip(u)) netCalls.push('beacon ' + u); return ob.apply(null, arguments); }; }
+    if (window.WebSocket) { var OW = window.WebSocket;
+      window.WebSocket = function(u){ netCalls.push('ws ' + u); return new OW(u); }; }
+  })();
+
   var n=0; while(!window.wrbg && n++<80) await S(100);
   if(!window.wrbg){ lines.push('FAIL  脚本未就绪（window.wrbg 不存在）'); fails++; return; }
 
@@ -320,6 +338,14 @@ $harness = @'
        Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+'  视口'+innerWidth+'x'+innerHeight);
   })();
   q('.wrbg-btn:not(.wrbg-fs-btn)').click();
+
+    // 到这里所有交互都做完了 —— 检查有没有产生过任何网络请求
+    ok('脚本不产生任何网络请求（运行时断言，静态扫描的补充）', netCalls.length === 0,
+       netCalls.length ? ('实际发生了: ' + netCalls.join(' | ')) : '');
+
+    // 到这里所有交互都做完了 —— 检查有没有产生过任何网络请求
+
+    // 到这里为止，所有交互都做完了 —— 现在检查有没有产生过任何网络请求
 
     // --- 站点改版自检：故障必须「用户可见」，不能只写 Console ---
     // 这一段的意义：v3.4.0 加了「自检失败就把背景图标染红」，但正常快照下

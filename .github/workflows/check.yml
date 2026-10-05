@@ -82,6 +82,20 @@ jobs:
         env: { GATE: '7', SCRIPT: '关卡-体积.ps1' }
         run: *gateRun
 
+      - name: 发布：自动打 tag + 建 Release
+        # 只在 push、且五道关卡全过时做。版本化 CDN 地址（…@v3.5.0/…）依赖 tag，
+        # 以前打 tag、写 Release 全靠人记得 —— 现在不用了。
+        # continue-on-error：发布是附加动作，API 抖动不该把构建判红。
+        if: |
+          github.event_name == 'push' &&
+          steps.gate1.outcome == 'success' && steps.gate4.outcome == 'success' &&
+          steps.gate5.outcome == 'success' && steps.gate6.outcome == 'success' &&
+          steps.gate7.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./工具/发布.ps1
       - name: 失败时把各关完整输出贴到提交评论
         # ⚠️ 用 steps.<id>.outcome 而不是 failure()：上面每步都带 continue-on-error，
         #    failure() 不会为它们触发。

@@ -1,7 +1,7 @@
 ﻿# ============================================================================
 # 微信读书脚本 · 交付检查（唯一入口）
 # ----------------------------------------------------------------------------
-# 一条命令跑完全部七道关卡，并往 工具/审查记录.md 追加一条记录。
+# 一条命令跑完全部八道关卡，并往 工具/审查记录.md 追加一条记录。
 #
 #   1. 封号审查     工具/安全审查.ps1
 #   2. 功能回归     工具/回归验证.ps1
@@ -41,6 +41,7 @@ $DocPs1     = Join-Path $PSScriptRoot '关卡-文档一致性.ps1'
 $HygPs1     = Join-Path $PSScriptRoot '关卡-仓库卫生.ps1'
 $DeadPs1    = Join-Path $PSScriptRoot '关卡-死代码.ps1'
 $SizePs1    = Join-Path $PSScriptRoot '关卡-体积.ps1'
+$ShotPs1    = Join-Path $PSScriptRoot '生成截图.ps1'
 $LogPath    = Join-Path $PSScriptRoot '审查记录.md'
 
 # 子关卡要另起进程跑（它们内部会 exit）。
@@ -60,7 +61,7 @@ $failed = 0
 # 父脚本就会静默把它当成通过 —— 而静默的绿比红危险得多。
 function Invoke-Gate {
   param([string]$Ps1, [int]$Index, [string]$Title)
-  Write-Host "【$Index/7】$Title" -ForegroundColor Yellow
+  Write-Host "【$Index/8】$Title" -ForegroundColor Yellow
   $out  = & $ShellExe -File $Ps1 2>&1
   $code = $LASTEXITCODE
   # 关卡脚本自己会打印 通过/失败 明细，这里原样回显（去掉它自己那行标题）
@@ -84,14 +85,14 @@ Write-Host ""
 
 # ---------------------------------------------------------------- 1. 封号审查
 # 封号打击的是「内容获取」和「账号行为」，不是本地改样式。这一关是发布前的硬门槛。
-Write-Host "【1/7】封号风险审查" -ForegroundColor Yellow
+Write-Host "【1/8】封号风险审查" -ForegroundColor Yellow
 & $ShellExe -File $AuditPs1
 $auditOk = ($LASTEXITCODE -eq 0)
 if (-not $auditOk) { $failed++ }
 
 # ---------------------------------------------------------------- 2. 功能回归
 $regPass = 0; $regFail = 0; $regOk = $true
-Write-Host "【2/7】功能回归" -ForegroundColor Yellow
+Write-Host "【2/8】功能回归" -ForegroundColor Yellow
 if ($SkipRegression) {
   Write-Host "  (已跳过)" -ForegroundColor DarkGray
 } else {
@@ -109,7 +110,7 @@ if ($SkipRegression) {
 # ---------------------------------------------------------------- 3. 像素验证
 # 回归只断言「计算样式」，看不出渲染出来的观感 —— v1.8.0 就是计算样式全绿、观感却很差。
 $pxPass = 0; $pxFail = 0; $pxOk = $true
-Write-Host "【3/7】像素验证" -ForegroundColor Yellow
+Write-Host "【3/8】像素验证" -ForegroundColor Yellow
 if ($SkipPixel -or $SkipRegression) {
   Write-Host "  (已跳过)" -ForegroundColor DarkGray
 } else {
@@ -129,6 +130,21 @@ $hygIssues  = Invoke-Gate $HygPs1  5 '仓库卫生'
 $deadIssues = Invoke-Gate $DeadPs1 6 '死代码检查'
 $null       = Invoke-Gate $SizePs1 7 '体积'
 
+# ---------------------------------------------------------------- 8. 配图
+# README 配图是**生成物**，却是项目的门面。第 8 关重渲染一次再和仓库里的图逐像素比 ——
+# 改了 UI 忘了重新生成，图就会和产品说的不是一回事，而以前没有任何关卡会发现。
+$shotOk = $true; $shotPass = 0; $shotFail = 0
+Write-Host "【8/8】README 配图" -ForegroundColor Yellow
+if ($SkipRegression) {
+  Write-Host "  (已跳过)" -ForegroundColor DarkGray
+} else {
+  $shotOut = & $ShellExe -File $ShotPs1 -Check 2>&1
+  $shotOk  = ($LASTEXITCODE -eq 0)
+  $shotPass = ($shotOut | Select-String -Pattern '\[通过\]').Count
+  $shotFail = ($shotOut | Select-String -Pattern '\[失败\]').Count
+  $shotOut | Select-String -Pattern '\[通过\]|\[失败\]|结论' | ForEach-Object { Write-Host $_.Line }
+  if ($shotFail -gt 0 -or -not $shotOk) { $failed++ }
+}
 # ---------------------------------------------------------------- 结论 + 记录
 Write-Host ""
 $verdict = if ($failed -eq 0) { '全部通过' } else { "$failed 项未通过" }
@@ -142,9 +158,10 @@ Write-Host ""
 # **审查记录被误读，比没有记录更糟。** 两种老布局按列数识别、补空位对齐：
 #   6 列：版本|时间|字节|功能回归|封号审查|死代码
 #   7 列：版本|时间|字节|功能回归|像素验证|封号审查|死代码
-#   9 列：当前布局（版本|时间|字节|功能回归|像素验证|文档一致|仓库卫生|封号审查|死代码）
-$wantedHeader = '| 版本 | 时间 | 字节 | 功能回归 | 像素验证 | 文档一致 | 仓库卫生 | 封号审查 | 死代码 |'
-$wantedSep    = '|---|---|---|---|---|---|---|---|---|'
+#   9 列：版本|时间|字节|功能回归|像素验证|文档一致|仓库卫生|封号审查|死代码
+#  10 列：当前布局（在「像素验证」后插入「配图」）
+$wantedHeader = '| 版本 | 时间 | 字节 | 功能回归 | 像素验证 | 配图 | 文档一致 | 仓库卫生 | 封号审查 | 死代码 |'
+$wantedSep    = '|---|---|---|---|---|---|---|---|---|---|'
 if (-not (Test-Path $LogPath)) {
   @(
     '# 审查记录',
@@ -175,11 +192,15 @@ if (-not (Test-Path $LogPath)) {
   for ($k = 0; $k -lt $logLines.Count; $k++) {
     if ($logLines[$k] -notmatch '^\|\s*v[\d.]+\s*\|') { continue }
     $cells = @(($logLines[$k].Trim('|') -split '\|') | ForEach-Object { $_.Trim() })
-    if ($cells.Count -eq 6) {
-      $logLines[$k] = '| ' + (($cells[0..3] + @('', '', '') + $cells[4..5]) -join ' | ') + ' |'
+    if ($cells.Count -eq 9) {
+      # 9 列 → 10 列：在「像素验证」（索引 4）之后插入「配图」
+      $logLines[$k] = '| ' + (($cells[0..4] + @('') + $cells[5..8]) -join ' | ') + ' |'
+      $migrated++
+    } elseif ($cells.Count -eq 6) {
+      $logLines[$k] = '| ' + (($cells[0..3] + @('', '', '', '') + $cells[4..5]) -join ' | ') + ' |'
       $migrated++
     } elseif ($cells.Count -eq 7) {
-      $logLines[$k] = '| ' + (($cells[0..4] + @('', '') + $cells[5..6]) -join ' | ') + ' |'
+      $logLines[$k] = '| ' + (($cells[0..4] + @('', '', '') + $cells[5..6]) -join ' | ') + ' |'
       $migrated++
     }
   }
@@ -192,9 +213,10 @@ if (-not (Test-Path $LogPath)) {
 }
 $regCell = if ($SkipRegression) { '跳过' } else { "$regPass 通过 / $regFail 失败" }
 $pxCell  = if ($SkipPixel -or $SkipRegression) { '跳过' } else { "$pxPass 通过 / $pxFail 未达标" }
-$row = '| v{0} | {1} | {2:N0} | {3} | {4} | {5} | {6} | {7} | {8} |' -f `
+$row = '| v{0} | {1} | {2:N0} | {3} | {4} | {5} | {6} | {7} | {8} | {9} |' -f `
   $ver, (Get-Date -Format 'yyyy-MM-dd HH:mm'), $bytes,
   $regCell, $pxCell,
+  $(if ($SkipRegression) { '跳过' } else { "$shotPass 通过 / $shotFail 未过" }),
   $(if ($docIssues -eq 0) { '通过' } else { '**' + [Math]::Max(1, $docIssues) + ' 项**' }),
   $(if ($hygIssues -eq 0) { '通过' } else { '**' + [Math]::Max(1, $hygIssues) + ' 项**' }),
   $(if ($auditOk) { '通过' } else { '**未通过**' }),

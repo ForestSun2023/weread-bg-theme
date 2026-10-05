@@ -596,7 +596,7 @@ html[data-wrbg] .reader_float_panel_container {
     if (!rowColorEl || !rowBgEl) return;
     const current = currentColor();
 
-    // 颜色行：四套底色任何时候都在（黑只是第四种，不再跟「模式」绑定）
+    // 颜色行：三套底色任何时候都在（第 4 种「黑」由站点自己的「深色」按钮提供，脚本不实现）
     rowColorEl.textContent = '';
     rowColorEl.setAttribute('role', 'radiogroup');
     rowColorEl.setAttribute('aria-label', '底色');

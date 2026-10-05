@@ -97,7 +97,7 @@ if (Test-Path $gfyPath) {
 # 4.6 文档里的关卡数必须与实际关卡脚本一致（防止「加了关卡忘了改文档」）
 # 实际关卡 = 3 个专门脚本 + 工具/关卡-*.ps1
 $gateCount = @(Get-ChildItem (Join-Path $Root '工具') -Filter *.ps1 |
-  Where-Object { $_.Name -match '^(安全审查|回归验证|像素验证|关卡-)' }).Count
+  Where-Object { $_.Name -match '^(安全审查|回归验证|像素验证|生成截图|关卡-)' }).Count
 $cnNum = @{ 1 = '一'; 2 = '二'; 3 = '三'; 4 = '四'; 5 = '五'; 6 = '六'; 7 = '七'; 8 = '八'; 9 = '九' }
 $wantPhrase = "$($cnNum[$gateCount])道关卡"
 if (-not $cnNum.ContainsKey($gateCount)) { $docIssues += "关卡数 $gateCount 超出了这个检查支持的中文数字范围" }
@@ -107,6 +107,28 @@ foreach ($doc in @('README.md', '设计思路.md')) {
   $t2 = Get-Content $p -Raw -Encoding UTF8
   if ($t2 -notmatch [regex]::Escape($wantPhrase)) {
     $docIssues += "$doc 里没有「$wantPhrase」（实际有 $gateCount 个关卡脚本）—— 关卡增减后文档没跟着改"
+  }
+}
+# 4.7 文档里的关卡**名字**也要对得上。
+# 只核数量的话，把两个关卡的名字对调、或改了一个名字，都发现不了。
+$gateNames = [ordered]@{
+  '安全审查.ps1'        = '封号风险审查'
+  '回归验证.ps1'        = '功能回归'
+  '像素验证.ps1'        = '像素验证'
+  '关卡-文档一致性.ps1' = '文档一致性'
+  '关卡-仓库卫生.ps1'   = '仓库卫生'
+  '关卡-死代码.ps1'     = '死代码'
+  '关卡-体积.ps1'       = '体积'
+  '生成截图.ps1'        = '配图'
+}
+foreach ($doc in @('README.md', '设计思路.md')) {
+  $p = Join-Path $Root $doc
+  if (-not (Test-Path $p)) { $docIssues += "$doc 不存在"; continue }
+  $text = Get-Content $p -Raw -Encoding UTF8
+  foreach ($k in $gateNames.Keys) {
+    if (-not $text.Contains($gateNames[$k])) {
+      $docIssues += "$doc 里找不到关卡名「$($gateNames[$k])」（对应 $k）—— 关卡被改名或漏写"
+    }
   }
 }
 $docOk = ($docIssues.Count -eq 0)
