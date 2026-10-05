@@ -131,6 +131,18 @@ foreach ($doc in @('README.md', '设计思路.md')) {
     }
   }
 }
+# 4.8 README 里写的断言数必须等于回归脚本里实际的 ok( 条数。
+# 这个数字以前是手写的，实测早就从 42 漂到了 46 而没人发现。
+$regPath = Join-Path $Root '工具/回归验证.ps1'
+if (Test-Path $regPath) {
+  $regTxt = Get-Content $regPath -Raw -Encoding UTF8
+  $realOk = ([regex]::Matches($regTxt, '(?m)^\s+ok\(')).Count
+  $rm = [regex]::Match($readme, '(\d+) 条断言 × 2 个模式快照')
+  if (-not $rm.Success) { $docIssues += "README.md 里找不到「N 条断言 × 2 个模式快照」" }
+  elseif ([int]$rm.Groups[1].Value -ne $realOk) {
+    $docIssues += "README.md 写的是 $($rm.Groups[1].Value) 条断言，回归脚本实际有 $realOk 条"
+  }
+} else { $docIssues += "工具/回归验证.ps1 不存在" }
 $docOk = ($docIssues.Count -eq 0)
 if ($docOk) {
   Write-Host ("  [ 通过 ] 版本号 4 处对齐（脚本/README徽标/CHANGELOG/使用说明）；" +

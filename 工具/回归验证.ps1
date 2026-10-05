@@ -111,6 +111,7 @@ $harness = @'
   // 从脚本就绪那一刻开始记，最后断言整段交互过程**一个请求都没有**。
   // 探针自己的 /report 要排除（那是 harness 的，不是脚本的）。
   var netCalls = [];
+
   (function(){
     var skip = function(u){ return String(u == null ? '' : (u.url || u)).indexOf('/report') >= 0; };
     if (window.fetch) { var of = window.fetch;
@@ -125,6 +126,7 @@ $harness = @'
 
   var n=0; while(!window.wrbg && n++<80) await S(100);
   if(!window.wrbg){ lines.push('FAIL  脚本未就绪（window.wrbg 不存在）'); fails++; return; }
+
 
   // headless 冻结 transition 时钟 → 必须先禁用，否则读到中间值
   var st=document.createElement('style');
@@ -338,6 +340,40 @@ $harness = @'
        Math.round(r.left)+','+Math.round(r.top)+' '+Math.round(r.width)+'x'+Math.round(r.height)+'  视口'+innerWidth+'x'+innerHeight);
   })();
   q('.wrbg-btn:not(.wrbg-fs-btn)').click();
+
+    // --- 公开 API 的每个成员都要真的被断言过 ---
+    // 第 6 关「死代码检查」只能证明函数被静态引用了，**证明不了被测过** —— 两件事。
+    // 这里逐个过一遍 window.wrbg 暴露的成员（reset 是写在 README 里给用户用的功能）。
+    ok('API: wrbg.colors 是那三套底色', JSON.stringify(window.wrbg.colors) === JSON.stringify(['white','sepia','green']),
+       '实际 ' + JSON.stringify(window.wrbg.colors));
+    ok('API: wrbg.backgrounds 是那五种纹理', JSON.stringify(window.wrbg.backgrounds) === JSON.stringify(['solid','paper','plain','cloud','moon']),
+       '实际 ' + JSON.stringify(window.wrbg.backgrounds));
+    var st0 = window.wrbg.state;
+    ok('API: wrbg.state 返回状态（含 colorId/bgId/brightness）',
+       !!st0 && typeof st0.colorId === 'string' && typeof st0.bgId === 'string' && typeof st0.brightness === 'number',
+       '实际 ' + JSON.stringify(st0));
+    st0.colorId = '__mutated__';
+    ok('API: wrbg.state 是副本（改它不影响脚本内部）', window.wrbg.state.colorId !== '__mutated__',
+       '实际 ' + window.wrbg.state.colorId);
+    ok('API: wrbg.dark 在白天为 false', window.wrbg.dark === false, '实际 ' + window.wrbg.dark);
+    window.wrbg.set({ colorId: 'sepia', bgId: 'paper', brightness: 0.5 });
+    await S(200);
+    var st1 = window.wrbg.state;
+    ok('API: wrbg.set 能改状态',
+       st1.colorId === 'sepia' && st1.bgId === 'paper' && Math.abs(st1.brightness - 0.5) < 0.01,
+       JSON.stringify(st1));
+    window.wrbg.reset();
+    await S(200);
+    var st2 = Object.assign({}, window.wrbg.state);
+    window.wrbg.reset();
+    await S(200);
+    var st3 = window.wrbg.state;
+    // 只断言**属性本身**：reset 能撤销刚才那次 set，且是幂等的。
+    // 不去猜"默认值是多少" —— 试过两种前提都错了：① 在测试中段记基准（那时颜色已被改过）；
+    // ② 用「进入页面时的状态」当默认（页面初始状态其实受已持久化的设置影响，双栏那份是 0.9）。
+    ok('API: wrbg.reset 能撤销 wrbg.set 的改动，且幂等',
+       st2.colorId !== 'sepia' && st2.bgId !== 'paper' && JSON.stringify(st2) === JSON.stringify(st3),
+       JSON.stringify(st2) + ' / 再 reset ' + JSON.stringify(st3));
 
     // 到这里所有交互都做完了 —— 检查有没有产生过任何网络请求
     ok('脚本不产生任何网络请求（运行时断言，静态扫描的补充）', netCalls.length === 0,
